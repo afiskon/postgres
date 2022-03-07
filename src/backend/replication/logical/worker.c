@@ -1048,7 +1048,7 @@ apply_handle_stream_prepare(StringInfo s)
 	logicalrep_read_stream_prepare(s, &prepare_data);
 	set_apply_error_context_xact(prepare_data.xid, prepare_data.prepare_lsn);
 
-	elog(DEBUG1, "received prepare for streamed transaction %u", prepare_data.xid);
+	elog(DEBUG1, "received prepare for streamed transaction " XID_FMT, prepare_data.xid);
 
 	/* Replay all the spooled operations. */
 	apply_spooled_messages(prepare_data.xid, prepare_data.prepare_lsn);
@@ -1430,7 +1430,7 @@ apply_handle_stream_commit(StringInfo s)
 	xid = logicalrep_read_stream_commit(s, &commit_data);
 	set_apply_error_context_xact(xid, commit_data.commit_lsn);
 
-	elog(DEBUG1, "received commit for streamed transaction %u", xid);
+	elog(DEBUG1, "received commit for streamed transaction " XID_FMT, xid);
 
 	apply_spooled_messages(xid, commit_data.commit_lsn);
 
@@ -3202,14 +3202,14 @@ subxact_info_add(TransactionId xid)
 static inline void
 subxact_filename(char *path, Oid subid, TransactionId xid)
 {
-	snprintf(path, MAXPGPATH, "%u-%u.subxacts", subid, xid);
+	snprintf(path, MAXPGPATH, "%u-" XID_FMT ".subxacts", subid, xid);
 }
 
 /* format filename for file containing serialized changes */
 static inline void
 changes_filename(char *path, Oid subid, TransactionId xid)
 {
-	snprintf(path, MAXPGPATH, "%u-%u.changes", subid, xid);
+	snprintf(path, MAXPGPATH, "%u-" XID_FMT ".changes", subid, xid);
 }
 
 /*
@@ -3371,7 +3371,7 @@ TwoPhaseTransactionGid(Oid subid, TransactionId xid, char *gid, int szgid)
 				(errcode(ERRCODE_PROTOCOL_VIOLATION),
 				 errmsg_internal("invalid two-phase transaction ID")));
 
-	snprintf(gid, szgid, "pg_gid_%u_%u", subid, xid);
+	snprintf(gid, szgid, "pg_gid_%u_" XID_FMT, subid, xid);
 }
 
 /* Logical Replication Apply worker entry point */
@@ -3682,19 +3682,19 @@ apply_error_callback(void *arg)
 					   errarg->origin_name,
 					   logicalrep_message_type(errarg->command));
 		else if (XLogRecPtrIsInvalid(errarg->finish_lsn))
-			errcontext("processing remote data for replication origin \"%s\" during \"%s\" in transaction %u",
+			errcontext("processing remote data for replication origin \"%s\" during \"%s\" in transaction " XID_FMT,
 					   errarg->origin_name,
 					   logicalrep_message_type(errarg->command),
 					   errarg->remote_xid);
 		else
-			errcontext("processing remote data for replication origin \"%s\" during \"%s\" in transaction %u finished at %X/%X",
+			errcontext("processing remote data for replication origin \"%s\" during \"%s\" in transaction " XID_FMT " finished at %X/%X",
 					   errarg->origin_name,
 					   logicalrep_message_type(errarg->command),
 					   errarg->remote_xid,
 					   LSN_FORMAT_ARGS(errarg->finish_lsn));
 	}
 	else if (errarg->remote_attnum < 0)
-		errcontext("processing remote data for replication origin \"%s\" during \"%s\" for replication target relation \"%s.%s\" in transaction %u finished at %X/%X",
+		errcontext("processing remote data for replication origin \"%s\" during \"%s\" for replication target relation \"%s.%s\" in transaction " XID_FMT " finished at %X/%X",
 				   errarg->origin_name,
 				   logicalrep_message_type(errarg->command),
 				   errarg->rel->remoterel.nspname,
@@ -3702,7 +3702,7 @@ apply_error_callback(void *arg)
 				   errarg->remote_xid,
 				   LSN_FORMAT_ARGS(errarg->finish_lsn));
 	else
-		errcontext("processing remote data for replication origin \"%s\" during \"%s\" for replication target relation \"%s.%s\" column \"%s\" in transaction %u finished at %X/%X",
+		errcontext("processing remote data for replication origin \"%s\" during \"%s\" for replication target relation \"%s.%s\" column \"%s\" in transaction " XID_FMT " finished at %X/%X",
 				   errarg->origin_name,
 				   logicalrep_message_type(errarg->command),
 				   errarg->rel->remoterel.nspname,

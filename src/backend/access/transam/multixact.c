@@ -451,7 +451,7 @@ MultiXactIdExpand(MultiXactId multi, TransactionId xid, MultiXactStatus status)
 	/* MultiXactIdSetOldestMember() must have been called already. */
 	Assert(MultiXactIdIsValid(OldestMemberMXactId[MyBackendId]));
 
-	debug_elog5(DEBUG2, "Expand: received multi %u, xid %u status %s",
+	debug_elog5(DEBUG2, "Expand: received multi " XID_FMT ", xid " XID_FMT " status %s",
 				multi, xid, mxstatus_to_string(status));
 
 	/*
@@ -476,7 +476,7 @@ MultiXactIdExpand(MultiXactId multi, TransactionId xid, MultiXactStatus status)
 		member.status = status;
 		newMulti = MultiXactIdCreateFromMembers(1, &member);
 
-		debug_elog4(DEBUG2, "Expand: %u has no members, create singleton %u",
+		debug_elog4(DEBUG2, "Expand: " XID_FMT " has no members, create singleton " XID_FMT,
 					multi, newMulti);
 		return newMulti;
 	}
@@ -490,7 +490,7 @@ MultiXactIdExpand(MultiXactId multi, TransactionId xid, MultiXactStatus status)
 		if (TransactionIdEquals(members[i].xid, xid) &&
 			(members[i].status == status))
 		{
-			debug_elog4(DEBUG2, "Expand: %u is already a member of %u",
+			debug_elog4(DEBUG2, "Expand: " XID_FMT " is already a member of " XID_FMT,
 						xid, multi);
 			pfree(members);
 			return multi;
@@ -526,12 +526,13 @@ MultiXactIdExpand(MultiXactId multi, TransactionId xid, MultiXactStatus status)
 
 	newMembers[j].xid = xid;
 	newMembers[j++].status = status;
+
 	newMulti = MultiXactIdCreateFromMembers(j, newMembers);
 
 	pfree(members);
 	pfree(newMembers);
 
-	debug_elog3(DEBUG2, "Expand: returning new multi %u", newMulti);
+	debug_elog3(DEBUG2, "Expand: returning new multi " XID_FMT, newMulti);
 
 	return newMulti;
 }
@@ -554,7 +555,7 @@ MultiXactIdIsRunning(MultiXactId multi, bool isLockOnly)
 	int			nmembers;
 	int			i;
 
-	debug_elog3(DEBUG2, "IsRunning %u?", multi);
+	debug_elog3(DEBUG2, "IsRunning " XID_FMT "?", multi);
 
 	/*
 	 * "false" here means we assume our callers have checked that the given
@@ -594,7 +595,7 @@ MultiXactIdIsRunning(MultiXactId multi, bool isLockOnly)
 	{
 		if (TransactionIdIsInProgress(members[i].xid))
 		{
-			debug_elog4(DEBUG2, "IsRunning: member %d (%u) is running",
+			debug_elog4(DEBUG2, "IsRunning: member %d (" XID_FMT ") is running",
 						i, members[i].xid);
 			pfree(members);
 			return true;
@@ -603,7 +604,7 @@ MultiXactIdIsRunning(MultiXactId multi, bool isLockOnly)
 
 	pfree(members);
 
-	debug_elog3(DEBUG2, "IsRunning: %u is not running", multi);
+	debug_elog3(DEBUG2, "IsRunning: " XID_FMT " is not running", multi);
 
 	return false;
 }
@@ -657,7 +658,7 @@ MultiXactIdSetOldestMember(void)
 
 		LWLockRelease(MultiXactGenLock);
 
-		debug_elog4(DEBUG2, "MultiXact: setting OldestMember[%d] = %u",
+		debug_elog4(DEBUG2, "MultiXact: setting OldestMember[%d] = " XID_FMT,
 					MyBackendId, nextMXact);
 	}
 }
@@ -722,7 +723,7 @@ MultiXactIdSetOldestVisible(void)
 
 		LWLockRelease(MultiXactGenLock);
 
-		debug_elog4(DEBUG2, "MultiXact: setting OldestVisible[%d] = %u",
+		debug_elog4(DEBUG2, "MultiXact: setting OldestVisible[%d] = " XID_FMT,
 					MyBackendId, oldestMXact);
 	}
 }
@@ -1200,7 +1201,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 
 	LWLockRelease(MultiXactGenLock);
 
-	debug_elog4(DEBUG2, "GetNew: returning %u offset %u", result, *offset);
+	debug_elog4(DEBUG2, "GetNew: returning " XID_FMT " offset %u", result, *offset);
 	return result;
 }
 
@@ -1250,7 +1251,7 @@ GetMultiXactIdMembers(MultiXactId multi, MultiXactMember **members,
 	MultiXactOffset nextOffset;
 	MultiXactMember *ptr;
 
-	debug_elog3(DEBUG2, "GetMembers: asked for %u", multi);
+	debug_elog3(DEBUG2, "GetMembers: asked for " XID_FMT, multi);
 
 	if (!MultiXactIdIsValid(multi) || from_pgupgrade)
 	{
@@ -1529,7 +1530,7 @@ mXactCacheGetBySet(int nmembers, MultiXactMember *members)
 		 */
 		if (memcmp(members, entry->members, nmembers * sizeof(MultiXactMember)) == 0)
 		{
-			debug_elog3(DEBUG2, "CacheGet: found %u", entry->multi);
+			debug_elog3(DEBUG2, "CacheGet: found " XID_FMT, entry->multi);
 			dlist_move_head(&MXactCache, iter.cur);
 			return entry->multi;
 		}
@@ -1552,7 +1553,7 @@ mXactCacheGetById(MultiXactId multi, MultiXactMember **members)
 {
 	dlist_iter	iter;
 
-	debug_elog3(DEBUG2, "CacheGet: looking for %u", multi);
+	debug_elog3(DEBUG2, "CacheGet: looking for " XID_FMT, multi);
 
 	dlist_foreach(iter, &MXactCache)
 	{
@@ -1633,7 +1634,7 @@ mXactCachePut(MultiXactId multi, int nmembers, MultiXactMember *members)
 		MXactCacheMembers--;
 
 		entry = dlist_container(mXactCacheEnt, node, node);
-		debug_elog3(DEBUG2, "CachePut: pruning cached multi %u",
+		debug_elog3(DEBUG2, "CachePut: pruning cached multi " XID_FMT,
 					entry->multi);
 
 		pfree(entry);
@@ -1675,11 +1676,11 @@ mxid_to_string(MultiXactId multi, int nmembers, MultiXactMember *members)
 
 	initStringInfo(&buf);
 
-	appendStringInfo(&buf, "%u %d[%u (%s)", multi, nmembers, members[0].xid,
+	appendStringInfo(&buf, XID_FMT " %d[" XID_FMT " (%s)", multi, nmembers, members[0].xid,
 					 mxstatus_to_string(members[0].status));
 
 	for (i = 1; i < nmembers; i++)
-		appendStringInfo(&buf, ", %u (%s)", members[i].xid,
+		appendStringInfo(&buf, ", " XID_FMT " (%s)", members[i].xid,
 						 mxstatus_to_string(members[i].status));
 
 	appendStringInfoChar(&buf, ']');
@@ -2156,7 +2157,7 @@ MultiXactGetCheckptMulti(bool is_shutdown,
 	LWLockRelease(MultiXactGenLock);
 
 	debug_elog6(DEBUG2,
-				"MultiXact: checkpoint is nextMulti %u, nextOffset %u, oldestMulti %u in DB %u",
+				"MultiXact: checkpoint is nextMulti " XID_FMT ", nextOffset %u, oldestMulti " XID_FMT " in DB %u",
 				*nextMulti, *nextMultiOffset, *oldestMulti, *oldestMultiDB);
 }
 
@@ -2191,7 +2192,7 @@ void
 MultiXactSetNextMXact(MultiXactId nextMulti,
 					  MultiXactOffset nextMultiOffset)
 {
-	debug_elog4(DEBUG2, "MultiXact: setting next multi to %u offset %u",
+	debug_elog4(DEBUG2, "MultiXact: setting next multi to " XID_FMT " offset %u",
 				nextMulti, nextMultiOffset);
 	LWLockAcquire(MultiXactGenLock, LW_EXCLUSIVE);
 	MultiXactState->nextMXact = nextMulti;
@@ -2377,7 +2378,7 @@ MultiXactAdvanceNextMXact(MultiXactId minMulti,
 	LWLockAcquire(MultiXactGenLock, LW_EXCLUSIVE);
 	if (MultiXactIdPrecedes(MultiXactState->nextMXact, minMulti))
 	{
-		debug_elog3(DEBUG2, "MultiXact: setting next multi to %u", minMulti);
+		debug_elog3(DEBUG2, "MultiXact: setting next multi to " XID_FMT, minMulti);
 		MultiXactState->nextMXact = minMulti;
 	}
 	if (MultiXactOffsetPrecedes(MultiXactState->nextOffset, minMultiOffset))
@@ -3040,7 +3041,7 @@ TruncateMultiXact(MultiXactId newOldestMulti, Oid newOldestMultiDB)
 	else if (!find_multixact_start(oldestMulti, &oldestOffset))
 	{
 		ereport(LOG,
-				(errmsg("oldest MultiXact %u not found, earliest MultiXact %u, skipping truncation",
+				(errmsg("oldest MultiXact " XID_FMT " not found, earliest MultiXact " XID_FMT ", skipping truncation",
 						oldestMulti, earliest)));
 		LWLockRelease(MultiXactTruncationLock);
 		return;
@@ -3058,14 +3059,14 @@ TruncateMultiXact(MultiXactId newOldestMulti, Oid newOldestMultiDB)
 	else if (!find_multixact_start(newOldestMulti, &newOldestOffset))
 	{
 		ereport(LOG,
-				(errmsg("cannot truncate up to MultiXact %u because it does not exist on disk, skipping truncation",
+				(errmsg("cannot truncate up to MultiXact " XID_FMT " because it does not exist on disk, skipping truncation",
 						newOldestMulti)));
 		LWLockRelease(MultiXactTruncationLock);
 		return;
 	}
 
 	elog(DEBUG1, "performing multixact truncation: "
-		 "offsets [%u, %u), offsets segments [%x, %x), "
+		 "offsets [" XID_FMT ", " XID_FMT "), offsets segments [%x, %x), "
 		 "members [%u, %u), members segments [%x, %x)",
 		 oldestMulti, newOldestMulti,
 		 MultiXactIdToOffsetSegment(oldestMulti),
@@ -3321,7 +3322,7 @@ multixact_redo(XLogReaderState *record)
 			   SizeOfMultiXactTruncate);
 
 		elog(DEBUG1, "replaying multixact truncation: "
-			 "offsets [%u, %u), offsets segments [%x, %x), "
+			 "offsets [" XID_FMT ", " XID_FMT "), offsets segments [%x, %x), "
 			 "members [%u, %u), members segments [%x, %x)",
 			 xlrec.startTruncOff, xlrec.endTruncOff,
 			 MultiXactIdToOffsetSegment(xlrec.startTruncOff),
@@ -3372,7 +3373,7 @@ pg_get_multixact_members(PG_FUNCTION_ARGS)
 	if (mxid < FirstMultiXactId)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid MultiXactId: %u", mxid)));
+				 errmsg("invalid MultiXactId: " XID_FMT, mxid)));
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -3408,7 +3409,7 @@ pg_get_multixact_members(PG_FUNCTION_ARGS)
 		HeapTuple	tuple;
 		char	   *values[2];
 
-		values[0] = psprintf("%u", multi->members[multi->iter].xid);
+		values[0] = psprintf(XID_FMT, multi->members[multi->iter].xid);
 		values[1] = mxstatus_to_string(multi->members[multi->iter].status);
 
 		tuple = BuildTupleFromCStrings(funccxt->attinmeta, values);

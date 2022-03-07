@@ -2754,12 +2754,12 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 					{
 						char		strfbuf[128];
 
-						snprintf(strfbuf, sizeof(strfbuf) - 1, "%d/%u",
+						snprintf(strfbuf, sizeof(strfbuf) - 1, "%d/" XID_FMT,
 								 MyProc->backendId, MyProc->lxid);
 						appendStringInfo(buf, "%*s", padding, strfbuf);
 					}
 					else
-						appendStringInfo(buf, "%d/%u", MyProc->backendId, MyProc->lxid);
+						appendStringInfo(buf, "%d/" XID_FMT, MyProc->backendId, MyProc->lxid);
 				}
 				else if (padding != 0)
 					appendStringInfoSpaces(buf,
@@ -2769,7 +2769,7 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 				if (padding != 0)
 					appendStringInfo(buf, "%*u", padding, GetTopTransactionIdIfAny());
 				else
-					appendStringInfo(buf, "%u", GetTopTransactionIdIfAny());
+					appendStringInfo(buf, XID_FMT, GetTopTransactionIdIfAny());
 				break;
 			case 'e':
 				if (padding != 0)

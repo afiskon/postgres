@@ -518,7 +518,7 @@ InitWalRecovery(ControlFileData *ControlFile, bool *wasShutdown_ptr,
 					(errmsg("entering standby mode")));
 		else if (recoveryTarget == RECOVERY_TARGET_XID)
 			ereport(LOG,
-					(errmsg("starting point-in-time recovery to XID %u",
+					(errmsg("starting point-in-time recovery to XID " XID_FMT,
 							recoveryTargetXid)));
 		else if (recoveryTarget == RECOVERY_TARGET_TIME)
 			ereport(LOG,
@@ -798,16 +798,16 @@ InitWalRecovery(ControlFileData *ControlFile, bool *wasShutdown_ptr,
 							 U64FromFullTransactionId(checkPoint.nextXid),
 							 checkPoint.nextOid)));
 	ereport(DEBUG1,
-			(errmsg_internal("next MultiXactId: %u; next MultiXactOffset: %u",
+			(errmsg_internal("next MultiXactId: " XID_FMT "; next MultiXactOffset: " XID_FMT,
 							 checkPoint.nextMulti, checkPoint.nextMultiOffset)));
 	ereport(DEBUG1,
-			(errmsg_internal("oldest unfrozen transaction ID: %u, in database %u",
+			(errmsg_internal("oldest unfrozen transaction ID: " XID_FMT ", in database %u",
 							 checkPoint.oldestXid, checkPoint.oldestXidDB)));
 	ereport(DEBUG1,
-			(errmsg_internal("oldest MultiXactId: %u, in database %u",
+			(errmsg_internal("oldest MultiXactId: " XID_FMT ", in database %u",
 							 checkPoint.oldestMulti, checkPoint.oldestMultiDB)));
 	ereport(DEBUG1,
-			(errmsg_internal("commit timestamp Xid oldest/newest: %u/%u",
+			(errmsg_internal("commit timestamp Xid oldest/newest: " XID_FMT "/" XID_FMT,
 							 checkPoint.oldestCommitTsXid,
 							 checkPoint.newestCommitTsXid)));
 	if (!TransactionIdIsNormal(XidFromFullTransactionId(checkPoint.nextXid)))
@@ -2490,14 +2490,14 @@ recoveryStopsBefore(XLogReaderState *record)
 		if (isCommit)
 		{
 			ereport(LOG,
-					(errmsg("recovery stopping before commit of transaction %u, time %s",
+					(errmsg("recovery stopping before commit of transaction " XID_FMT ", time %s",
 							recoveryStopXid,
 							timestamptz_to_str(recoveryStopTime))));
 		}
 		else
 		{
 			ereport(LOG,
-					(errmsg("recovery stopping before abort of transaction %u, time %s",
+					(errmsg("recovery stopping before abort of transaction " XID_FMT ", time %s",
 							recoveryStopXid,
 							timestamptz_to_str(recoveryStopTime))));
 		}
@@ -2635,7 +2635,7 @@ recoveryStopsAfter(XLogReaderState *record)
 				xact_info == XLOG_XACT_COMMIT_PREPARED)
 			{
 				ereport(LOG,
-						(errmsg("recovery stopping after commit of transaction %u, time %s",
+						(errmsg("recovery stopping after commit of transaction " XID_FMT ", time %s",
 								recoveryStopXid,
 								timestamptz_to_str(recoveryStopTime))));
 			}
@@ -2643,7 +2643,7 @@ recoveryStopsAfter(XLogReaderState *record)
 					 xact_info == XLOG_XACT_ABORT_PREPARED)
 			{
 				ereport(LOG,
-						(errmsg("recovery stopping after abort of transaction %u, time %s",
+						(errmsg("recovery stopping after abort of transaction " XID_FMT ", time %s",
 								recoveryStopXid,
 								timestamptz_to_str(recoveryStopTime))));
 			}
@@ -2679,7 +2679,7 @@ getRecoveryStopReason(void)
 
 	if (recoveryTarget == RECOVERY_TARGET_XID)
 		snprintf(reason, sizeof(reason),
-				 "%s transaction %u",
+				 "%s transaction " XID_FMT,
 				 recoveryStopAfter ? "after" : "before",
 				 recoveryStopXid);
 	else if (recoveryTarget == RECOVERY_TARGET_TIME)
