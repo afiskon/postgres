@@ -64,7 +64,7 @@ static SlruCtlData SubTransCtlData;
 
 
 static int	ZeroSUBTRANSPage(int pageno);
-static bool SubTransPagePrecedes(int page1, int page2);
+static bool SubTransPagePrecedes(int64 page1, int64 page2);
 
 
 /*
@@ -359,7 +359,7 @@ TruncateSUBTRANS(TransactionId oldestXact)
  * Analogous to CLOGPagePrecedes().
  */
 static bool
-SubTransPagePrecedes(int page1, int page2)
+SubTransPagePrecedes(int64 page1, int64 page2)
 {
 	TransactionId xid1;
 	TransactionId xid2;
