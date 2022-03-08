@@ -848,8 +848,12 @@ DecodeInsert(LogicalDecodingContext *ctx, XLogRecordBuffer *buf)
 	xl_heap_insert *xlrec;
 	ReorderBufferChange *change;
 	RelFileNode target_node;
+	bool		isinit = (XLogRecGetInfo(r) & XLOG_HEAP_INIT_PAGE) != 0;
+	Pointer		rec_data = (Pointer) XLogRecGetData(r);
 
-	xlrec = (xl_heap_insert *) XLogRecGetData(r);
+	if (isinit)
+		rec_data += sizeof(TransactionId);
+	xlrec = (xl_heap_insert *) rec_data;
 
 	/*
 	 * Ignore insert records without new tuples (this does happen when
@@ -905,8 +909,12 @@ DecodeUpdate(LogicalDecodingContext *ctx, XLogRecordBuffer *buf)
 	ReorderBufferChange *change;
 	char	   *data;
 	RelFileNode target_node;
+	bool		isinit = (XLogRecGetInfo(r) & XLOG_HEAP_INIT_PAGE) != 0;
+	Pointer		rec_data = (Pointer) XLogRecGetData(r);
 
-	xlrec = (xl_heap_update *) XLogRecGetData(r);
+	if (isinit)
+		rec_data += sizeof(TransactionId);
+	xlrec = (xl_heap_update *) rec_data;
 
 	/* only interested in our database */
 	XLogRecGetBlockTag(r, 0, &target_node, NULL, NULL);
@@ -1066,8 +1074,12 @@ DecodeMultiInsert(LogicalDecodingContext *ctx, XLogRecordBuffer *buf)
 	char	   *tupledata;
 	Size		tuplelen;
 	RelFileNode rnode;
+	bool		isinit = (XLogRecGetInfo(r) & XLOG_HEAP_INIT_PAGE) != 0;
+	Pointer		rec_data = (Pointer) XLogRecGetData(r);
 
-	xlrec = (xl_heap_multi_insert *) XLogRecGetData(r);
+	if (isinit)
+		rec_data += sizeof(TransactionId);
+	xlrec = (xl_heap_multi_insert *) rec_data;
 
 	/*
 	 * Ignore insert records without new tuples.  This happens when a

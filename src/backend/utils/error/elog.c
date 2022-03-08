@@ -2767,7 +2767,7 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 				break;
 			case 'x':
 				if (padding != 0)
-					appendStringInfo(buf, "%*u", padding, GetTopTransactionIdIfAny());
+					appendStringInfo(buf, "%*" INT64_MODIFIER "u", padding, GetTopTransactionIdIfAny());
 				else
 					appendStringInfo(buf, XID_FMT, GetTopTransactionIdIfAny());
 				break;

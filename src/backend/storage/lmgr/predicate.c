@@ -790,16 +790,7 @@ FlagSxactUnsafe(SERIALIZABLEXACT *sxact)
 static bool
 SerialPagePrecedesLogically(int64 page1, int64 page2)
 {
-	TransactionId xid1;
-	TransactionId xid2;
-
-	xid1 = ((TransactionId) page1) * SERIAL_ENTRIESPERPAGE;
-	xid1 += FirstNormalTransactionId + 1;
-	xid2 = ((TransactionId) page2) * SERIAL_ENTRIESPERPAGE;
-	xid2 += FirstNormalTransactionId + 1;
-
-	return (TransactionIdPrecedes(xid1, xid2) &&
-			TransactionIdPrecedes(xid1, xid2 + SERIAL_ENTRIESPERPAGE - 1));
+	return page1 < page2;
 }
 
 #ifdef USE_ASSERT_CHECKING

@@ -63,13 +63,12 @@
 /*
  * GUC parameters
  */
-int			vacuum_freeze_min_age;
-int			vacuum_freeze_table_age;
-int			vacuum_multixact_freeze_min_age;
-int			vacuum_multixact_freeze_table_age;
-int			vacuum_failsafe_age;
-int			vacuum_multixact_failsafe_age;
-
+int64		vacuum_freeze_min_age;
+int64		vacuum_freeze_table_age;
+int64		vacuum_multixact_freeze_min_age;
+int64		vacuum_multixact_freeze_table_age;
+int64		vacuum_failsafe_age;
+int64		vacuum_multixact_failsafe_age;
 
 /* A few variables that don't seem worth passing around as parameters */
 static MemoryContext vac_context = NULL;
@@ -956,23 +955,25 @@ get_all_vacuum_rels(int options)
  */
 bool
 vacuum_set_xid_limits(Relation rel,
-					  int freeze_min_age,
-					  int freeze_table_age,
-					  int multixact_freeze_min_age,
-					  int multixact_freeze_table_age,
+					  int64 freeze_min_age,
+					  int64 freeze_table_age,
+					  int64 multixact_freeze_min_age,
+					  int64 multixact_freeze_table_age,
 					  TransactionId *oldestXmin,
 					  TransactionId *freezeLimit,
 					  MultiXactId *multiXactCutoff)
 {
-	int			freezemin;
-	int			mxid_freezemin;
-	int			effective_multixact_freeze_max_age;
+	int64			freezemin;
+	int64			mxid_freezemin;
+	int64			effective_multixact_freeze_max_age;
 	TransactionId limit;
 	TransactionId safeLimit;
 	MultiXactId oldestMxact;
 	MultiXactId mxactLimit;
 	MultiXactId safeMxactLimit;
-	int			freezetable;
+	int64		freezetable;
+	TransactionId nextXid;
+	TransactionId nextMxactId;
 
 	/*
 	 * We can always ignore processes running lazy vacuum.  This is because we
@@ -1021,8 +1022,10 @@ vacuum_set_xid_limits(Relation rel,
 	/*
 	 * Compute the cutoff XID, being careful not to generate a "permanent" XID
 	 */
-	limit = *oldestXmin - freezemin;
-	if (!TransactionIdIsNormal(limit))
+	limit = *oldestXmin;
+	if (limit > FirstNormalTransactionId + freezemin)
+		limit -= freezemin;
+	else
 		limit = FirstNormalTransactionId;
 
 	/*
@@ -1030,8 +1033,10 @@ vacuum_set_xid_limits(Relation rel,
 	 * autovacuum_freeze_max_age / 2 XIDs old), complain and force a minimum
 	 * freeze age of zero.
 	 */
-	safeLimit = ReadNextTransactionId() - autovacuum_freeze_max_age;
-	if (!TransactionIdIsNormal(safeLimit))
+	nextXid = ReadNextTransactionId();
+	if (nextXid > FirstNormalTransactionId + autovacuum_freeze_max_age)
+		safeLimit = nextXid - autovacuum_freeze_max_age;
+	else
 		safeLimit = FirstNormalTransactionId;
 
 	if (TransactionIdPrecedes(limit, safeLimit))
@@ -1050,7 +1055,7 @@ vacuum_set_xid_limits(Relation rel,
 	 * normally autovacuum_multixact_freeze_max_age, but may be less if we are
 	 * short of multixact member space.
 	 */
-	effective_multixact_freeze_max_age = MultiXactMemberFreezeThreshold();
+	effective_multixact_freeze_max_age = autovacuum_multixact_freeze_max_age;
 
 	/*
 	 * Determine the minimum multixact freeze age to use: as specified by
@@ -1071,16 +1076,23 @@ vacuum_set_xid_limits(Relation rel,
 	if (mxactLimit < FirstMultiXactId)
 		mxactLimit = FirstMultiXactId;
 
-	safeMxactLimit =
-		ReadNextMultiXactId() - effective_multixact_freeze_max_age;
-	if (safeMxactLimit < FirstMultiXactId)
+	nextMxactId = ReadNextMultiXactId();
+	if (nextMxactId > FirstMultiXactId + effective_multixact_freeze_max_age)
+		safeMxactLimit = nextMxactId - effective_multixact_freeze_max_age;
+	else
 		safeMxactLimit = FirstMultiXactId;
 
 	if (MultiXactIdPrecedes(mxactLimit, safeMxactLimit))
 	{
 		ereport(WARNING,
-				(errmsg("oldest multixact is far in the past"),
-				 errhint("Close open transactions with multixacts soon to avoid wraparound problems.")));
+				(errmsg("oldest multixact is far in the past: "
+						INT64_FORMAT " " INT64_FORMAT " "
+						INT64_FORMAT " " INT64_FORMAT " " INT64_FORMAT " "
+						INT64_FORMAT " " INT64_FORMAT " ",
+						multixact_freeze_min_age, vacuum_multixact_freeze_min_age,
+						mxactLimit, mxid_freezemin, oldestMxact,
+						safeMxactLimit, effective_multixact_freeze_max_age),
+				 errhint("Close open transactions with multixacts soon to enable SLRU truncation.")));
 		/* Use the safe limit, unless an older mxact is still running */
 		if (MultiXactIdPrecedes(oldestMxact, safeMxactLimit))
 			mxactLimit = oldestMxact;
@@ -1110,8 +1122,10 @@ vacuum_set_xid_limits(Relation rel,
 	 * Compute XID limit causing an aggressive vacuum, being careful not to
 	 * generate a "permanent" XID
 	 */
-	limit = ReadNextTransactionId() - freezetable;
-	if (!TransactionIdIsNormal(limit))
+	limit = ReadNextTransactionId();
+	if (limit > FirstNormalTransactionId + freezetable)
+		limit -= freezetable;
+	else
 		limit = FirstNormalTransactionId;
 	if (TransactionIdPrecedesOrEquals(rel->rd_rel->relfrozenxid,
 									  limit))
@@ -1136,8 +1150,10 @@ vacuum_set_xid_limits(Relation rel,
 	 * Compute MultiXact limit causing an aggressive vacuum, being careful to
 	 * generate a valid MultiXact value
 	 */
-	mxactLimit = ReadNextMultiXactId() - freezetable;
-	if (mxactLimit < FirstMultiXactId)
+	mxactLimit = ReadNextMultiXactId();
+	if (mxactLimit > FirstMultiXactId + freezetable)
+		mxactLimit -= freezetable;
+	else
 		mxactLimit = FirstMultiXactId;
 	if (MultiXactIdPrecedesOrEquals(rel->rd_rel->relminmxid,
 									mxactLimit))

@@ -130,7 +130,7 @@ pgrowlocks(PG_FUNCTION_ARGS)
 		htsu = HeapTupleSatisfiesUpdate(tuple,
 										GetCurrentCommandId(false),
 										hscan->rs_cbuf);
-		xmax = HeapTupleHeaderGetRawXmax(tuple->t_data);
+		xmax = HeapTupleGetRawXmax(tuple);
 		infomask = tuple->t_data->t_infomask;
 
 		/*

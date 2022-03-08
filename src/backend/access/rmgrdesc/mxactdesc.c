@@ -55,17 +55,17 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 	if (info == XLOG_MULTIXACT_ZERO_OFF_PAGE ||
 		info == XLOG_MULTIXACT_ZERO_MEM_PAGE)
 	{
-		int			pageno;
+		int64			pageno;
 
-		memcpy(&pageno, rec, sizeof(int));
-		appendStringInfo(buf, "%d", pageno);
+		memcpy(&pageno, rec, sizeof(int)); /* should it be sizeof(int64) ??? - a.alekseev */
+		appendStringInfo(buf, INT64_FORMAT, pageno);
 	}
 	else if (info == XLOG_MULTIXACT_CREATE_ID)
 	{
 		xl_multixact_create *xlrec = (xl_multixact_create *) rec;
 		int			i;
 
-		appendStringInfo(buf, XID_FMT " offset %u nmembers %d: ", xlrec->mid,
+		appendStringInfo(buf, XID_FMT " offset " INT64_FORMAT " nmembers %d: ", xlrec->mid,
 						 xlrec->moff, xlrec->nmembers);
 		for (i = 0; i < xlrec->nmembers; i++)
 			out_member(buf, &xlrec->members[i]);
@@ -74,7 +74,7 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_multixact_truncate *xlrec = (xl_multixact_truncate *) rec;
 
-		appendStringInfo(buf, "offsets [" XID_FMT ", " XID_FMT "), members [%u, %u)",
+		appendStringInfo(buf, "offsets [" XID_FMT ", " XID_FMT "), members [" INT64_FORMAT ", " INT64_FORMAT ")",
 						 xlrec->startTruncOff, xlrec->endTruncOff,
 						 xlrec->startTruncMemb, xlrec->endTruncMemb);
 	}

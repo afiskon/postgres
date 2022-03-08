@@ -5443,13 +5443,13 @@ ShowTransactionStateRec(const char *str, TransactionState s)
 		ShowTransactionStateRec(str, s->parent);
 
 	ereport(DEBUG5,
-			(errmsg_internal("%s(%d) name: %s; blockState: %s; state: %s, xid/subid/cid: " XID_FMT "/" XID_FMT "/%u%s%s",
+           (errmsg_internal("%s(%d) name: %s; blockState: %s; state: %s, xid/subid/cid: " XID_FMT "/" XID_FMT "/%u%s%s",
 							 str, s->nestingLevel,
 							 PointerIsValid(s->name) ? s->name : "unnamed",
 							 BlockStateAsString(s->blockState),
 							 TransStateAsString(s->state),
-							 (unsigned int) XidFromFullTransactionId(s->fullTransactionId),
-							 (unsigned int) s->subTransactionId,
+                             XidFromFullTransactionId(s->fullTransactionId),
+                             s->subTransactionId,
 							 (unsigned int) currentCommandId,
 							 currentCommandIdUsed ? " (used)" : "",
 							 buf.data)));
@@ -5632,6 +5632,17 @@ XactLogCommitRecord(TimestampTz commit_time,
 		xl_subxacts.nsubxacts = nsubxacts;
 	}
 
+	if (TransactionIdIsValid(twophase_xid))
+	{
+		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
+		xl_twophase.xid_lo = (uint32)(twophase_xid & 0xFFFFFFFF);
+		xl_twophase.xid_hi = (uint32)(twophase_xid >> 32);
+		Assert(twophase_gid != NULL);
+
+		if (XLogLogicalInfoActive())
+			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
+	}
+
 	if (nrels > 0)
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_RELFILENODES;
@@ -5643,16 +5654,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_INVALS;
 		xl_invals.nmsgs = nmsgs;
-	}
-
-	if (TransactionIdIsValid(twophase_xid))
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
-		xl_twophase.xid = twophase_xid;
-		Assert(twophase_gid != NULL);
-
-		if (XLogLogicalInfoActive())
-			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	/* dump transaction origin information */
@@ -5765,21 +5766,22 @@ XactLogAbortRecord(TimestampTz abort_time,
 		xl_subxacts.nsubxacts = nsubxacts;
 	}
 
+	if (TransactionIdIsValid(twophase_xid))
+	{
+		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
+		xl_twophase.xid_lo = (uint32)(twophase_xid & 0xFFFFFFFF);
+		xl_twophase.xid_hi = (uint32)(twophase_xid >> 32);
+		Assert(twophase_gid != NULL);
+
+		if (XLogLogicalInfoActive())
+			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
+	}
+
 	if (nrels > 0)
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_RELFILENODES;
 		xl_relfilenodes.nrels = nrels;
 		info |= XLR_SPECIAL_REL_UPDATE;
-	}
-
-	if (TransactionIdIsValid(twophase_xid))
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
-		xl_twophase.xid = twophase_xid;
-		Assert(twophase_gid != NULL);
-
-		if (XLogLogicalInfoActive())
-			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	if (TransactionIdIsValid(twophase_xid) && XLogLogicalInfoActive())

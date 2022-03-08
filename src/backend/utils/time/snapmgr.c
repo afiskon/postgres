@@ -1174,8 +1174,9 @@ ExportSnapshot(Snapshot snapshot)
 	 * Generate file path for the snapshot.  We start numbering of snapshots
 	 * inside the transaction from 1.
 	 */
-	snprintf(path, sizeof(path), SNAPSHOT_EXPORT_DIR "/%08X-%08X-%d",
-			 MyProc->backendId, MyProc->lxid, list_length(exportedSnapshots) + 1);
+	snprintf(path, sizeof(path), SNAPSHOT_EXPORT_DIR "/%08X-%08X%08X-%d",
+			 MyProc->backendId, (uint32) (MyProc->lxid >> 32),
+			 (uint32) MyProc->lxid, list_length(exportedSnapshots) + 1);
 
 	/*
 	 * Copy the snapshot into TopTransactionContext, add it to the

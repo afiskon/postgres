@@ -75,6 +75,10 @@
 #include <libintl.h>
 #endif
 
+#if HAVE_INTTYPES_H
+#include "inttypes.h"
+#endif
+
 
 /* ----------------------------------------------------------------
  *				Section 1: compiler characteristics
@@ -584,23 +588,42 @@ typedef double float8;
 typedef Oid regproc;
 typedef regproc RegProcedure;
 
-typedef uint32 TransactionId;
+#define MAX_START_XID  UINT64CONST(0x3fffffffffffffff)
 
-typedef uint32 LocalTransactionId;
+typedef uint64 TransactionId;
+ 
+#define TransactionIdPrecedes(id1, id2) ((id1) < (id2))
+#define TransactionIdPrecedesOrEquals(id1, id2) ((id1) <= (id2))
+#define TransactionIdFollows(id1, id2) ((id1) > (id2))
+#define TransactionIdFollowsOrEquals(id1, id2) ((id1) >= (id2))
+ 
+#define StartTransactionIdIsValid(start_xid)   ((start_xid) <= MAX_START_XID)
 
-typedef uint32 SubTransactionId;
+typedef uint32 ShortTransactionId;
 
-#define InvalidSubTransactionId		((SubTransactionId) 0)
-#define TopSubTransactionId			((SubTransactionId) 1)
+typedef uint64 LocalTransactionId;
 
-/* Format string used for XIDs. */
-#define XID_FMT "%u"
+typedef uint64 SubTransactionId;
+ 
+ #define InvalidSubTransactionId        ((SubTransactionId) 0)
+ #define TopSubTransactionId            ((SubTransactionId) 1)
+ 
+#define XID_FMT UINT64_FORMAT
 
-/* MultiXactId must be equivalent to TransactionId, to fit in t_xmax */
-typedef TransactionId MultiXactId;
+ /* MultiXactId must be equivalent to TransactionId, to fit in t_xmax */
+ typedef TransactionId MultiXactId;
+ 
+#define MultiXactIdPrecedes(id1, id2) ((id1) < (id2))
+#define MultiXactIdPrecedesOrEquals(id1, id2) ((id1) <= (id2))
+#define MultiXactIdFollows(id1, id2) ((id1) > (id2))
+#define MultiXactIdFollowsOrEquals(id1, id2) ((id1) >= (id2))
 
-typedef uint32 MultiXactOffset;
+#define StartMultiXactIdIsValid(start_mx_id)   ((start_mx_id) <= MAX_START_XID)
 
+typedef uint64 MultiXactOffset;
+
+#define StartMultiXactOffsetIsValid(start_mx_offset)   ((start_mx_offset) <= MAX_START_XID)
+ 
 typedef uint32 CommandId;
 
 #define FirstCommandId	((CommandId) 0)

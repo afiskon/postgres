@@ -458,7 +458,7 @@ ForgetPrivateRefCountEntry(PrivateRefCountEntry *ref)
 )
 
 
-static Buffer ReadBuffer_common(SMgrRelation reln, char relpersistence,
+static Buffer ReadBuffer_common(Relation rel, SMgrRelation reln, char relpersistence,
 								ForkNumber forkNum, BlockNumber blockNum,
 								ReadBufferMode mode, BufferAccessStrategy strategy,
 								bool *hit);
@@ -760,7 +760,8 @@ ReadBufferExtended(Relation reln, ForkNumber forkNum, BlockNumber blockNum,
 	 * miss.
 	 */
 	pgstat_count_buffer_read(reln);
-	buf = ReadBuffer_common(RelationGetSmgr(reln), reln->rd_rel->relpersistence,
+	buf = ReadBuffer_common(reln, RelationGetSmgr(reln),
+							reln->rd_rel->relpersistence,
 							forkNum, blockNum, mode, strategy, &hit);
 	if (hit)
 		pgstat_count_buffer_hit(reln);
@@ -788,7 +789,7 @@ ReadBufferWithoutRelcache(RelFileNode rnode, ForkNumber forkNum,
 
 	Assert(InRecovery);
 
-	return ReadBuffer_common(smgr, RELPERSISTENCE_PERMANENT, forkNum, blockNum,
+	return ReadBuffer_common(NULL, smgr, RELPERSISTENCE_PERMANENT, forkNum, blockNum,
 							 mode, strategy, &hit);
 }
 
@@ -799,7 +800,7 @@ ReadBufferWithoutRelcache(RelFileNode rnode, ForkNumber forkNum,
  * *hit is set to true if the request was satisfied from shared buffer cache.
  */
 static Buffer
-ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
+ReadBuffer_common(Relation rel, SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				  BlockNumber blockNum, ReadBufferMode mode,
 				  BufferAccessStrategy strategy, bool *hit)
 {
@@ -1030,6 +1031,27 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 							 errmsg("invalid page in block %u of relation %s",
 									blockNum,
 									relpath(smgr->smgr_rnode, forkNum))));
+			}
+
+			if (PageGetPageLayoutVersion(bufBlock) != PG_PAGE_LAYOUT_VERSION &&
+				!PageIsNew((Page) bufBlock))
+			{
+				Buffer		buf = BufferDescriptorGetBuffer(bufHdr);
+
+				/*
+				 * Normally we should not be here with rel == NULL, since XLog
+				 * replayer should read new page versions from Full Page Write
+				 * records.
+				 *
+				 * But there is TryReadRepairBlock in repairworker.c that
+				 * could. (PgProEE feature).
+				 */
+				if (rel != NULL)
+				{
+					LWLockAcquire(BufferDescriptorGetContentLock(bufHdr), LW_EXCLUSIVE);
+					convert_page(rel, bufBlock, buf, blockNum);
+					LWLockRelease(BufferDescriptorGetContentLock(bufHdr));
+				}
 			}
 		}
 	}
@@ -3954,6 +3976,64 @@ MarkBufferDirtyHint(Buffer buffer, bool buffer_std)
 				VacuumCostBalance += VacuumCostPageDirty;
 		}
 	}
+}
+
+/*
+ * Mark buffer as converted - ie its format is changed without logical changes.
+ *
+ * It will override `full_page_write` GUC setting in XLogRecordAssemble.
+ */
+void
+MarkBufferConverted(Buffer buffer, bool converted)
+{
+	BufferDesc *bufHdr;
+	uint32		buf_state;
+	bool		has_mark;
+
+	if (!BufferIsValid(buffer))
+		elog(ERROR, "bad buffer ID: %d", buffer);
+
+	Assert(!BufferIsLocal(buffer));
+
+	bufHdr = GetBufferDescriptor(buffer - 1);
+
+	Assert(GetPrivateRefCount(buffer) > 0);
+	if (converted)
+	{
+		/* here, either share or exclusive lock is OK */
+		Assert(LWLockHeldByMe(BufferDescriptorGetContentLock(bufHdr)));
+	}
+
+	buf_state = pg_atomic_read_u32(&bufHdr->state);
+	has_mark = (buf_state & BM_CONVERTED) != 0;
+	if (converted == has_mark)
+		return;
+
+	buf_state = LockBufHdr(bufHdr);
+	buf_state &= ~BM_CONVERTED;
+	if (converted)
+		buf_state |= BM_CONVERTED;
+	UnlockBufHdr(bufHdr, buf_state);
+}
+
+bool
+IsBufferConverted(Buffer buffer)
+{
+
+	BufferDesc *bufHdr;
+	uint32		buf_state;
+
+	if (!BufferIsValid(buffer))
+		elog(ERROR, "bad buffer ID: %d", buffer);
+
+	Assert(!BufferIsLocal(buffer));
+
+	bufHdr = GetBufferDescriptor(buffer - 1);
+
+	Assert(GetPrivateRefCount(buffer) > 0);
+
+	buf_state = pg_atomic_read_u32(&bufHdr->state);
+	return (buf_state & BM_CONVERTED) != 0;
 }
 
 /*

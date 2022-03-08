@@ -180,6 +180,23 @@ heap2_desc(StringInfo buf, XLogReaderState *record)
 	}
 }
 
+void
+heap3_desc(StringInfo buf, XLogReaderState *record)
+{
+	char	   *rec = XLogRecGetData(record);
+	uint8		info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
+
+	info &= XLOG_HEAP_OPMASK;
+	if (info == XLOG_HEAP3_BASE_SHIFT)
+	{
+		xl_heap_base_shift *xlrec = (xl_heap_base_shift *) rec;
+
+		appendStringInfo(buf, "%s delta " INT64_FORMAT " ",
+						 xlrec->multi ? "MultiXactId" : "XactId",
+						 xlrec->delta);
+	}
+}
+
 const char *
 heap_identify(uint8 info)
 {
@@ -258,6 +275,21 @@ heap2_identify(uint8 info)
 			break;
 		case XLOG_HEAP2_REWRITE:
 			id = "REWRITE";
+			break;
+	}
+
+	return id;
+}
+
+const char *
+heap3_identify(uint8 info)
+{
+	const char *id = NULL;
+
+	switch (info & ~XLR_INFO_MASK)
+	{
+		case XLOG_HEAP3_BASE_SHIFT:
+			id = "BASE_SHIFT";
 			break;
 	}
 
