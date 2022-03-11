@@ -354,8 +354,8 @@ static char *mxstatus_to_string(MultiXactStatus status);
 /* management of SLRU infrastructure */
 static int	ZeroMultiXactOffsetPage(int pageno, bool writeXlog);
 static int	ZeroMultiXactMemberPage(int pageno, bool writeXlog);
-static bool MultiXactOffsetPagePrecedes(int page1, int page2);
-static bool MultiXactMemberPagePrecedes(int page1, int page2);
+static bool MultiXactOffsetPagePrecedes(int64 page1, int64 page2);
+static bool MultiXactMemberPagePrecedes(int64 page1, int64 page2);
 static bool MultiXactOffsetPrecedes(MultiXactOffset offset1,
 									MultiXactOffset offset2);
 static void ExtendMultiXactOffset(MultiXactId multi);
@@ -2855,7 +2855,7 @@ MultiXactMemberFreezeThreshold(void)
 
 typedef struct mxtruncinfo
 {
-	int			earliestExistingPage;
+	int64		earliestExistingPage;
 } mxtruncinfo;
 
 /*
@@ -2863,7 +2863,7 @@ typedef struct mxtruncinfo
  *		This callback determines the earliest existing page number.
  */
 static bool
-SlruScanDirCbFindEarliest(SlruCtl ctl, char *filename, int segpage, void *data)
+SlruScanDirCbFindEarliest(SlruCtl ctl, char *filename, int64 segpage, void *data)
 {
 	mxtruncinfo *trunc = (mxtruncinfo *) data;
 
@@ -3114,7 +3114,7 @@ TruncateMultiXact(MultiXactId newOldestMulti, Oid newOldestMultiDB)
  * translational symmetry.
  */
 static bool
-MultiXactOffsetPagePrecedes(int page1, int page2)
+MultiXactOffsetPagePrecedes(int64 page1, int64 page2)
 {
 	MultiXactId multi1;
 	MultiXactId multi2;
@@ -3134,7 +3134,7 @@ MultiXactOffsetPagePrecedes(int page1, int page2)
  * purposes.  There is no "invalid offset number" so use the numbers verbatim.
  */
 static bool
-MultiXactMemberPagePrecedes(int page1, int page2)
+MultiXactMemberPagePrecedes(int64 page1, int64 page2)
 {
 	MultiXactOffset offset1;
 	MultiXactOffset offset2;

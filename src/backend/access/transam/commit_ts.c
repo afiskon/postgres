@@ -108,7 +108,7 @@ static void TransactionIdSetCommitTs(TransactionId xid, TimestampTz ts,
 									 RepOriginId nodeid, int slotno);
 static void error_commit_ts_disabled(void);
 static int	ZeroCommitTsPage(int pageno, bool writeXlog);
-static bool CommitTsPagePrecedes(int page1, int page2);
+static bool CommitTsPagePrecedes(int64 page1, int64 page2);
 static void ActivateCommitTs(void);
 static void DeactivateCommitTs(void);
 static void WriteZeroPageXlogRec(int pageno);
@@ -851,7 +851,7 @@ ExtendCommitTs(TransactionId newestXact)
 void
 TruncateCommitTs(TransactionId oldestXact)
 {
-	int			cutoffPage;
+	int64		cutoffPage;
 
 	/*
 	 * The cutoff point is the start of the segment containing oldestXact. We
@@ -865,7 +865,7 @@ TruncateCommitTs(TransactionId oldestXact)
 		return;					/* nothing to remove */
 
 	/* Write XLOG record */
-	WriteTruncateXlogRec(cutoffPage, oldestXact);
+	WriteTruncateXlogRec((int)cutoffPage, oldestXact);
 
 	/* Now we can remove the old CommitTs segment(s) */
 	SimpleLruTruncate(CommitTsCtl, cutoffPage);
@@ -936,7 +936,7 @@ AdvanceOldestCommitTsXid(TransactionId oldestXact)
  * oldestXact=N+2.1, it would be precious at oldestXact=N+2.9.
  */
 static bool
-CommitTsPagePrecedes(int page1, int page2)
+CommitTsPagePrecedes(int64 page1, int64 page2)
 {
 	TransactionId xid1;
 	TransactionId xid2;

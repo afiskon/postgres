@@ -90,7 +90,7 @@ static SlruCtlData XactCtlData;
 
 
 static int	ZeroCLOGPage(int pageno, bool writeXlog);
-static bool CLOGPagePrecedes(int page1, int page2);
+static bool CLOGPagePrecedes(int64 page1, int64 page2);
 static void WriteZeroPageXlogRec(int pageno);
 static void WriteTruncateXlogRec(int pageno, TransactionId oldestXact,
 								 Oid oldestXactDb);
@@ -877,7 +877,7 @@ ExtendCLOG(TransactionId newestXact)
 void
 TruncateCLOG(TransactionId oldestXact, Oid oldestxid_datoid)
 {
-	int			cutoffPage;
+	int64		cutoffPage;
 
 	/*
 	 * The cutoff point is the start of the segment containing oldestXact. We
@@ -904,7 +904,7 @@ TruncateCLOG(TransactionId oldestXact, Oid oldestxid_datoid)
 	 * ahead of clog truncation in case we crash, and so a standby finds out
 	 * the new valid xid before the next checkpoint.
 	 */
-	WriteTruncateXlogRec(cutoffPage, oldestXact, oldestxid_datoid);
+	WriteTruncateXlogRec((int)cutoffPage, oldestXact, oldestxid_datoid);
 
 	/* Now we can remove the old CLOG segment(s) */
 	SimpleLruTruncate(XactCtl, cutoffPage);
@@ -930,7 +930,7 @@ TruncateCLOG(TransactionId oldestXact, Oid oldestxid_datoid)
  * don't optimize that edge case.
  */
 static bool
-CLOGPagePrecedes(int page1, int page2)
+CLOGPagePrecedes(int64 page1, int64 page2)
 {
 	TransactionId xid1;
 	TransactionId xid2;
