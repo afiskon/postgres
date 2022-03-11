@@ -26,18 +26,18 @@ out_gistxlogPageUpdate(StringInfo buf, gistxlogPageUpdate *xlrec)
 static void
 out_gistxlogPageReuse(StringInfo buf, gistxlogPageReuse *xlrec)
 {
-	appendStringInfo(buf, "rel %u/%u/%u; blk %u; latestRemovedXid %u:%u",
+	appendStringInfo(buf, "rel %u/%u/%u; blk %u; latestRemovedXid %u:%llu",
 					 xlrec->node.spcNode, xlrec->node.dbNode,
 					 xlrec->node.relNode, xlrec->block,
 					 EpochFromFullTransactionId(xlrec->latestRemovedFullXid),
-					 XidFromFullTransactionId(xlrec->latestRemovedFullXid));
+					 (XID_FMT_TYPE) XidFromFullTransactionId(xlrec->latestRemovedFullXid));
 }
 
 static void
 out_gistxlogDelete(StringInfo buf, gistxlogDelete *xlrec)
 {
-	appendStringInfo(buf, "delete: latestRemovedXid %u, nitems: %u",
-					 xlrec->latestRemovedXid, xlrec->ntodelete);
+	appendStringInfo(buf, "delete: latestRemovedXid %llu, nitems: %u",
+					 (XID_FMT_TYPE) xlrec->latestRemovedXid, xlrec->ntodelete);
 
 }
 
@@ -51,9 +51,9 @@ out_gistxlogPageSplit(StringInfo buf, gistxlogPageSplit *xlrec)
 static void
 out_gistxlogPageDelete(StringInfo buf, gistxlogPageDelete *xlrec)
 {
-	appendStringInfo(buf, "deleteXid %u:%u; downlink %u",
+	appendStringInfo(buf, "deleteXid %u:%llu; downlink %u",
 					 EpochFromFullTransactionId(xlrec->deleteXid),
-					 XidFromFullTransactionId(xlrec->deleteXid),
+					 (XID_FMT_TYPE) XidFromFullTransactionId(xlrec->deleteXid),
 					 xlrec->downlinkOffset);
 }
 

@@ -45,26 +45,26 @@ xlog_desc(StringInfo buf, XLogReaderState *record)
 		CheckPoint *checkpoint = (CheckPoint *) rec;
 
 		appendStringInfo(buf, "redo %X/%X; "
-						 "tli %u; prev tli %u; fpw %s; xid %u:%u; oid %u; multi %u; offset %u; "
-						 "oldest xid %u in DB %u; oldest multi %u in DB %u; "
-						 "oldest/newest commit timestamp xid: %u/%u; "
-						 "oldest running xid %u; %s",
+						 "tli %u; prev tli %u; fpw %s; xid %u:%llu; oid %u; multi %llu; offset %u; "
+						 "oldest xid %llu in DB %u; oldest multi %llu in DB %u; "
+						 "oldest/newest commit timestamp xid: %llu/%llu; "
+						 "oldest running xid %llu; %s",
 						 LSN_FORMAT_ARGS(checkpoint->redo),
 						 checkpoint->ThisTimeLineID,
 						 checkpoint->PrevTimeLineID,
 						 checkpoint->fullPageWrites ? "true" : "false",
 						 EpochFromFullTransactionId(checkpoint->nextXid),
-						 XidFromFullTransactionId(checkpoint->nextXid),
+						 (XID_FMT_TYPE) XidFromFullTransactionId(checkpoint->nextXid),
 						 checkpoint->nextOid,
-						 checkpoint->nextMulti,
+						 (XID_FMT_TYPE) checkpoint->nextMulti,
 						 checkpoint->nextMultiOffset,
-						 checkpoint->oldestXid,
+						 (XID_FMT_TYPE) checkpoint->oldestXid,
 						 checkpoint->oldestXidDB,
-						 checkpoint->oldestMulti,
+						 (XID_FMT_TYPE) checkpoint->oldestMulti,
 						 checkpoint->oldestMultiDB,
-						 checkpoint->oldestCommitTsXid,
-						 checkpoint->newestCommitTsXid,
-						 checkpoint->oldestActiveXid,
+						 (XID_FMT_TYPE) checkpoint->oldestCommitTsXid,
+						 (XID_FMT_TYPE) checkpoint->newestCommitTsXid,
+						 (XID_FMT_TYPE) checkpoint->oldestActiveXid,
 						 (info == XLOG_CHECKPOINT_SHUTDOWN) ? "shutdown" : "online");
 	}
 	else if (info == XLOG_NEXTOID)

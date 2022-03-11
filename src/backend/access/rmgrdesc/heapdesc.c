@@ -58,27 +58,27 @@ heap_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_heap_update *xlrec = (xl_heap_update *) rec;
 
-		appendStringInfo(buf, "off %u xmax %u flags 0x%02X ",
+		appendStringInfo(buf, "off %u xmax %llu flags 0x%02X ",
 						 xlrec->old_offnum,
-						 xlrec->old_xmax,
+						 (XID_FMT_TYPE) xlrec->old_xmax,
 						 xlrec->flags);
 		out_infobits(buf, xlrec->old_infobits_set);
-		appendStringInfo(buf, "; new off %u xmax %u",
+		appendStringInfo(buf, "; new off %u xmax %llu",
 						 xlrec->new_offnum,
-						 xlrec->new_xmax);
+						 (XID_FMT_TYPE) xlrec->new_xmax);
 	}
 	else if (info == XLOG_HEAP_HOT_UPDATE)
 	{
 		xl_heap_update *xlrec = (xl_heap_update *) rec;
 
-		appendStringInfo(buf, "off %u xmax %u flags 0x%02X ",
+		appendStringInfo(buf, "off %u xmax %llu flags 0x%02X ",
 						 xlrec->old_offnum,
-						 xlrec->old_xmax,
+						 (XID_FMT_TYPE) xlrec->old_xmax,
 						 xlrec->flags);
 		out_infobits(buf, xlrec->old_infobits_set);
-		appendStringInfo(buf, "; new off %u xmax %u",
+		appendStringInfo(buf, "; new off %u xmax %llu",
 						 xlrec->new_offnum,
-						 xlrec->new_xmax);
+						 (XID_FMT_TYPE) xlrec->new_xmax);
 	}
 	else if (info == XLOG_HEAP_TRUNCATE)
 	{
@@ -103,8 +103,8 @@ heap_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_heap_lock *xlrec = (xl_heap_lock *) rec;
 
-		appendStringInfo(buf, "off %u: xid %u: flags 0x%02X ",
-						 xlrec->offnum, xlrec->locking_xid, xlrec->flags);
+		appendStringInfo(buf, "off %u: xid %llu: flags 0x%02X ",
+						 xlrec->offnum, (XID_FMT_TYPE) xlrec->locking_xid, xlrec->flags);
 		out_infobits(buf, xlrec->infobits_set);
 	}
 	else if (info == XLOG_HEAP_INPLACE)
@@ -125,8 +125,8 @@ heap2_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_heap_prune *xlrec = (xl_heap_prune *) rec;
 
-		appendStringInfo(buf, "latestRemovedXid %u nredirected %u ndead %u",
-						 xlrec->latestRemovedXid,
+		appendStringInfo(buf, "latestRemovedXid %llu nredirected %u ndead %u",
+						 (XID_FMT_TYPE) xlrec->latestRemovedXid,
 						 xlrec->nredirected,
 						 xlrec->ndead);
 	}
@@ -140,15 +140,15 @@ heap2_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_heap_freeze_page *xlrec = (xl_heap_freeze_page *) rec;
 
-		appendStringInfo(buf, "cutoff xid %u ntuples %u",
-						 xlrec->cutoff_xid, xlrec->ntuples);
+		appendStringInfo(buf, "cutoff xid %llu ntuples %u",
+						 (XID_FMT_TYPE) xlrec->cutoff_xid, xlrec->ntuples);
 	}
 	else if (info == XLOG_HEAP2_VISIBLE)
 	{
 		xl_heap_visible *xlrec = (xl_heap_visible *) rec;
 
-		appendStringInfo(buf, "cutoff xid %u flags 0x%02X",
-						 xlrec->cutoff_xid, xlrec->flags);
+		appendStringInfo(buf, "cutoff xid %llu flags 0x%02X",
+						 (XID_FMT_TYPE) xlrec->cutoff_xid, xlrec->flags);
 	}
 	else if (info == XLOG_HEAP2_MULTI_INSERT)
 	{
@@ -161,8 +161,8 @@ heap2_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_heap_lock_updated *xlrec = (xl_heap_lock_updated *) rec;
 
-		appendStringInfo(buf, "off %u: xmax %u: flags 0x%02X ",
-						 xlrec->offnum, xlrec->xmax, xlrec->flags);
+		appendStringInfo(buf, "off %u: xmax %llu: flags 0x%02X ",
+						 xlrec->offnum, (XID_FMT_TYPE) xlrec->xmax, xlrec->flags);
 		out_infobits(buf, xlrec->infobits_set);
 	}
 	else if (info == XLOG_HEAP2_NEW_CID)

@@ -849,7 +849,7 @@ TwoPhaseGetGXact(TransactionId xid, bool lock_held)
 		LWLockRelease(TwoPhaseStateLock);
 
 	if (result == NULL)			/* should not happen */
-		elog(ERROR, "failed to find GlobalTransaction for xid %u", xid);
+		elog(ERROR, "failed to find GlobalTransaction for xid %llu", (XID_FMT_TYPE) xid);
 
 	cached_xid = xid;
 	cached_gxact = result;
@@ -2054,7 +2054,7 @@ RecoverPreparedTransactions(void)
 			continue;
 
 		ereport(LOG,
-				(errmsg("recovering prepared transaction %u from shared memory", xid)));
+				(errmsg("recovering prepared transaction %llu from shared memory", (XID_FMT_TYPE) xid)));
 
 		hdr = (TwoPhaseFileHeader *) buf;
 		Assert(TransactionIdEquals(hdr->xid, xid));
@@ -2145,15 +2145,15 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		if (fromdisk)
 		{
 			ereport(WARNING,
-					(errmsg("removing stale two-phase state file for transaction %u",
-							xid)));
+					(errmsg("removing stale two-phase state file for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 			RemoveTwoPhaseFile(xid, true);
 		}
 		else
 		{
 			ereport(WARNING,
-					(errmsg("removing stale two-phase state from memory for transaction %u",
-							xid)));
+					(errmsg("removing stale two-phase state from memory for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 			PrepareRedoRemove(xid, true);
 		}
 		return NULL;
@@ -2165,15 +2165,15 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		if (fromdisk)
 		{
 			ereport(WARNING,
-					(errmsg("removing future two-phase state file for transaction %u",
-							xid)));
+					(errmsg("removing future two-phase state file for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 			RemoveTwoPhaseFile(xid, true);
 		}
 		else
 		{
 			ereport(WARNING,
-					(errmsg("removing future two-phase state from memory for transaction %u",
-							xid)));
+					(errmsg("removing future two-phase state from memory for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 			PrepareRedoRemove(xid, true);
 		}
 		return NULL;
@@ -2197,13 +2197,13 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		if (fromdisk)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("corrupted two-phase state file for transaction %u",
-							xid)));
+					 errmsg("corrupted two-phase state file for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("corrupted two-phase state in memory for transaction %u",
-							xid)));
+					 errmsg("corrupted two-phase state in memory for transaction %llu",
+							(XID_FMT_TYPE) xid)));
 	}
 
 	/*
@@ -2358,8 +2358,8 @@ RecordTransactionAbortPrepared(TransactionId xid,
 	 * RecordTransactionCommitPrepared ...
 	 */
 	if (TransactionIdDidCommit(xid))
-		elog(PANIC, "cannot abort transaction %u, it was already committed",
-			 xid);
+		elog(PANIC, "cannot abort transaction %llu, it was already committed",
+			 (XID_FMT_TYPE) xid);
 
 	START_CRIT_SECTION();
 
@@ -2465,7 +2465,7 @@ PrepareRedoAdd(char *buf, XLogRecPtr start_lsn,
 						   false /* backward */ , false /* WAL */ );
 	}
 
-	elog(DEBUG2, "added 2PC data in shared memory for transaction %u", gxact->xid);
+	elog(DEBUG2, "added 2PC data in shared memory for transaction %llu", (XID_FMT_TYPE) gxact->xid);
 }
 
 /*
@@ -2508,7 +2508,7 @@ PrepareRedoRemove(TransactionId xid, bool giveWarning)
 	/*
 	 * And now we can clean up any files we may have left.
 	 */
-	elog(DEBUG2, "removing 2PC data for transaction %u", xid);
+	elog(DEBUG2, "removing 2PC data for transaction %llu", (XID_FMT_TYPE) xid);
 	if (gxact->ondisk)
 		RemoveTwoPhaseFile(xid, giveWarning);
 	RemoveGXact(gxact);

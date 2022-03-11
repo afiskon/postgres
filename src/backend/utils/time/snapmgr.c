@@ -1202,14 +1202,14 @@ ExportSnapshot(Snapshot snapshot)
 	 */
 	initStringInfo(&buf);
 
-	appendStringInfo(&buf, "vxid:%d/%u\n", MyProc->backendId, MyProc->lxid);
+	appendStringInfo(&buf, "vxid:%d/%llu\n", MyProc->backendId, (XID_FMT_TYPE) MyProc->lxid);
 	appendStringInfo(&buf, "pid:%d\n", MyProcPid);
 	appendStringInfo(&buf, "dbid:%u\n", MyDatabaseId);
 	appendStringInfo(&buf, "iso:%d\n", XactIsoLevel);
 	appendStringInfo(&buf, "ro:%d\n", XactReadOnly);
 
-	appendStringInfo(&buf, "xmin:%u\n", snapshot->xmin);
-	appendStringInfo(&buf, "xmax:%u\n", snapshot->xmax);
+	appendStringInfo(&buf, "xmin:%llu\n", (XID_FMT_TYPE) snapshot->xmin);
+	appendStringInfo(&buf, "xmax:%llu\n", (XID_FMT_TYPE) snapshot->xmax);
 
 	/*
 	 * We must include our own top transaction ID in the top-xid data, since
@@ -1226,9 +1226,9 @@ ExportSnapshot(Snapshot snapshot)
 				 TransactionIdPrecedes(topXid, snapshot->xmax)) ? 1 : 0;
 	appendStringInfo(&buf, "xcnt:%d\n", snapshot->xcnt + addTopXid);
 	for (i = 0; i < snapshot->xcnt; i++)
-		appendStringInfo(&buf, "xip:%u\n", snapshot->xip[i]);
+		appendStringInfo(&buf, "xip:%llu\n", (XID_FMT_TYPE) snapshot->xip[i]);
 	if (addTopXid)
-		appendStringInfo(&buf, "xip:%u\n", topXid);
+		appendStringInfo(&buf, "xip:%llu\n", (XID_FMT_TYPE) topXid);
 
 	/*
 	 * Similarly, we add our subcommitted child XIDs to the subxid data. Here,
@@ -1242,9 +1242,9 @@ ExportSnapshot(Snapshot snapshot)
 		appendStringInfoString(&buf, "sof:0\n");
 		appendStringInfo(&buf, "sxcnt:%d\n", snapshot->subxcnt + nchildren);
 		for (i = 0; i < snapshot->subxcnt; i++)
-			appendStringInfo(&buf, "sxp:%u\n", snapshot->subxip[i]);
+			appendStringInfo(&buf, "sxp:%llu\n", (XID_FMT_TYPE) snapshot->subxip[i]);
 		for (i = 0; i < nchildren; i++)
-			appendStringInfo(&buf, "sxp:%u\n", children[i]);
+			appendStringInfo(&buf, "sxp:%llu\n", (XID_FMT_TYPE) children[i]);
 	}
 	appendStringInfo(&buf, "rec:%u\n", snapshot->takenDuringRecovery);
 
@@ -1347,7 +1347,7 @@ parseXidFromText(const char *prefix, char **s, const char *filename)
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("invalid snapshot data in file \"%s\"", filename)));
 	ptr += prefixlen;
-	if (sscanf(ptr, "%u", &val) != 1)
+	if (sscanf(ptr, XID32_SCANF_FMT, &val) != 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("invalid snapshot data in file \"%s\"", filename)));
@@ -1372,7 +1372,7 @@ parseVxidFromText(const char *prefix, char **s, const char *filename,
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("invalid snapshot data in file \"%s\"", filename)));
 	ptr += prefixlen;
-	if (sscanf(ptr, "%d/%u", &vxid->backendId, &vxid->localTransactionId) != 2)
+	if (sscanf(ptr, "%d/" XID32_SCANF_FMT, &vxid->backendId, &vxid->localTransactionId) != 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("invalid snapshot data in file \"%s\"", filename)));

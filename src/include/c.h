@@ -593,6 +593,11 @@ typedef uint32 SubTransactionId;
 #define InvalidSubTransactionId		((SubTransactionId) 0)
 #define TopSubTransactionId			((SubTransactionId) 1)
 
+/* printf/elog format compatible with 32 and 64 bit xid. */
+typedef unsigned long long		XID_FMT_TYPE;
+/* Temp define while internal xid is 32 bit. */
+#define XID32_SCANF_FMT			"%u"
+
 /* MultiXactId must be equivalent to TransactionId, to fit in t_xmax */
 typedef TransactionId MultiXactId;
 

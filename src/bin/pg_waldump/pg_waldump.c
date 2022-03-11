@@ -486,10 +486,10 @@ XLogDumpDisplayRecord(XLogDumpConfig *config, XLogReaderState *record)
 
 	XLogDumpRecordLen(record, &rec_len, &fpi_len);
 
-	printf("rmgr: %-11s len (rec/tot): %6u/%6u, tx: %10u, lsn: %X/%08X, prev %X/%08X, ",
+	printf("rmgr: %-11s len (rec/tot): %6u/%6u, tx: %20llu, lsn: %X/%08X, prev %X/%08X, ",
 		   desc->rm_name,
 		   rec_len, XLogRecGetTotalLen(record),
-		   XLogRecGetXid(record),
+		   (XID_FMT_TYPE) XLogRecGetXid(record),
 		   LSN_FORMAT_ARGS(record->ReadRecPtr),
 		   LSN_FORMAT_ARGS(xl_prev));
 
@@ -948,7 +948,7 @@ main(int argc, char **argv)
 				}
 				break;
 			case 'x':
-				if (sscanf(optarg, "%u", &config.filter_by_xid) != 1)
+				if (sscanf(optarg, XID32_SCANF_FMT, &config.filter_by_xid) != 1)
 				{
 					pg_log_error("could not parse \"%s\" as a transaction ID",
 								 optarg);

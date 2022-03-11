@@ -19,7 +19,7 @@
 static void
 out_member(StringInfo buf, MultiXactMember *member)
 {
-	appendStringInfo(buf, "%u ", member->xid);
+	appendStringInfo(buf, "%llu ", (XID_FMT_TYPE) member->xid);
 	switch (member->status)
 	{
 		case MultiXactStatusForKeyShare:
@@ -65,7 +65,7 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 		xl_multixact_create *xlrec = (xl_multixact_create *) rec;
 		int			i;
 
-		appendStringInfo(buf, "%u offset %u nmembers %d: ", xlrec->mid,
+		appendStringInfo(buf, "%llu offset %u nmembers %d: ", (XID_FMT_TYPE) xlrec->mid,
 						 xlrec->moff, xlrec->nmembers);
 		for (i = 0; i < xlrec->nmembers; i++)
 			out_member(buf, &xlrec->members[i]);
@@ -74,8 +74,8 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_multixact_truncate *xlrec = (xl_multixact_truncate *) rec;
 
-		appendStringInfo(buf, "offsets [%u, %u), members [%u, %u)",
-						 xlrec->startTruncOff, xlrec->endTruncOff,
+		appendStringInfo(buf, "offsets [%llu, %llu), members [%u, %u)",
+						 (XID_FMT_TYPE) xlrec->startTruncOff, (XID_FMT_TYPE) xlrec->endTruncOff,
 						 xlrec->startTruncMemb, xlrec->endTruncMemb);
 	}
 }

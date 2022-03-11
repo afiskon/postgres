@@ -21,15 +21,15 @@ standby_desc_running_xacts(StringInfo buf, xl_running_xacts *xlrec)
 {
 	int			i;
 
-	appendStringInfo(buf, "nextXid %u latestCompletedXid %u oldestRunningXid %u",
-					 xlrec->nextXid,
-					 xlrec->latestCompletedXid,
-					 xlrec->oldestRunningXid);
+	appendStringInfo(buf, "nextXid %llu latestCompletedXid %llu oldestRunningXid %llu",
+					 (XID_FMT_TYPE) xlrec->nextXid,
+					 (XID_FMT_TYPE) xlrec->latestCompletedXid,
+					 (XID_FMT_TYPE) xlrec->oldestRunningXid);
 	if (xlrec->xcnt > 0)
 	{
 		appendStringInfo(buf, "; %d xacts:", xlrec->xcnt);
 		for (i = 0; i < xlrec->xcnt; i++)
-			appendStringInfo(buf, " %u", xlrec->xids[i]);
+			appendStringInfo(buf, " %llu", (XID_FMT_TYPE) xlrec->xids[i]);
 	}
 
 	if (xlrec->subxid_overflow)
@@ -48,8 +48,8 @@ standby_desc(StringInfo buf, XLogReaderState *record)
 		int			i;
 
 		for (i = 0; i < xlrec->nlocks; i++)
-			appendStringInfo(buf, "xid %u db %u rel %u ",
-							 xlrec->locks[i].xid, xlrec->locks[i].dbOid,
+			appendStringInfo(buf, "xid %llu db %u rel %u ",
+							 (XID_FMT_TYPE) xlrec->locks[i].xid, xlrec->locks[i].dbOid,
 							 xlrec->locks[i].relOid);
 	}
 	else if (info == XLOG_RUNNING_XACTS)

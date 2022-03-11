@@ -1216,8 +1216,8 @@ XLogWalRcvSendHSFeedback(bool immed)
 	if (nextXid < catalog_xmin)
 		catalog_xmin_epoch--;
 
-	elog(DEBUG2, "sending hot standby feedback xmin %u epoch %u catalog_xmin %u catalog_xmin_epoch %u",
-		 xmin, xmin_epoch, catalog_xmin, catalog_xmin_epoch);
+	elog(DEBUG2, "sending hot standby feedback xmin %llu epoch %u catalog_xmin %llu catalog_xmin_epoch %u",
+		 (XID_FMT_TYPE) xmin, xmin_epoch, (XID_FMT_TYPE) catalog_xmin, catalog_xmin_epoch);
 
 	/* Construct the message and send it. */
 	resetStringInfo(&reply_message);
