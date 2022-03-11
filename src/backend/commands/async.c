@@ -186,8 +186,8 @@ typedef struct AsyncQueueEntry
 	char		data[NAMEDATALEN + NOTIFY_PAYLOAD_MAX_LENGTH];
 } AsyncQueueEntry;
 
-/* Currently, no field of AsyncQueueEntry requires more than int alignment */
-#define QUEUEALIGN(len)		INTALIGN(len)
+/* AsyncQueueEntry.xid requires 8-byte alignment */
+#define QUEUEALIGN(len)		TYPEALIGN(8, len)
 
 #define AsyncQueueEntryEmptySize	(offsetof(AsyncQueueEntry, data) + 2)
 
@@ -443,8 +443,8 @@ static bool tryAdvanceTail = false;
 bool		Trace_notify = false;
 
 /* local function prototypes */
-static int	asyncQueuePageDiff(int p, int q);
-static bool asyncQueuePagePrecedes(int p, int q);
+static int64	asyncQueuePageDiff(int64 p, int64 q);
+static bool asyncQueuePagePrecedes(int64 p, int64 q);
 static void queue_listen(ListenActionKind action, const char *channel);
 static void Async_UnlistenOnExit(int code, Datum arg);
 static void Exec_ListenPreCommit(void);
@@ -477,10 +477,10 @@ static void ClearPendingActionsAndNotifies(void);
  * Compute the difference between two queue page numbers (i.e., p - q),
  * accounting for wraparound.
  */
-static int
-asyncQueuePageDiff(int p, int q)
+static int64
+asyncQueuePageDiff(int64 p, int64 q)
 {
-	int			diff;
+	int64		diff;
 
 	/*
 	 * We have to compare modulo (QUEUE_MAX_PAGE+1)/2.  Both inputs should be
@@ -497,14 +497,8 @@ asyncQueuePageDiff(int p, int q)
 	return diff;
 }
 
-/*
- * Is p < q, accounting for wraparound?
- *
- * Since asyncQueueIsFull() blocks creation of a page that could precede any
- * extant page, we need not assess entries within a page.
- */
 static bool
-asyncQueuePagePrecedes(int p, int q)
+asyncQueuePagePrecedes(int64 p, int64 q)
 {
 	return asyncQueuePageDiff(p, q) < 0;
 }

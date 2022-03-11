@@ -438,7 +438,7 @@ static void SetPossibleUnsafeConflict(SERIALIZABLEXACT *roXact, SERIALIZABLEXACT
 static void ReleaseRWConflict(RWConflict conflict);
 static void FlagSxactUnsafe(SERIALIZABLEXACT *sxact);
 
-static bool SerialPagePrecedesLogically(int page1, int page2);
+static bool SerialPagePrecedesLogically(int64 page1, int64 page2);
 static void SerialInit(void);
 static void SerialAdd(TransactionId xid, SerCommitSeqNo minConflictCommitSeqNo);
 static SerCommitSeqNo SerialGetMinConflictCommitSeqNo(TransactionId xid);
@@ -788,7 +788,7 @@ FlagSxactUnsafe(SERIALIZABLEXACT *sxact)
  * Analogous to CLOGPagePrecedes().
  */
 static bool
-SerialPagePrecedesLogically(int page1, int page2)
+SerialPagePrecedesLogically(int64 page1, int64 page2)
 {
 	TransactionId xid1;
 	TransactionId xid2;
