@@ -916,25 +916,6 @@ AdvanceOldestCommitTsXid(TransactionId oldestXact)
 /*
  * Decide whether a commitTS page number is "older" for truncation purposes.
  * Analogous to CLOGPagePrecedes().
- *
- * At default BLCKSZ, (1 << 31) % COMMIT_TS_XACTS_PER_PAGE == 128.  This
- * introduces differences compared to CLOG and the other SLRUs having (1 <<
- * 31) % per_page == 0.  This function never tests exactly
- * TransactionIdPrecedes(x-2^31, x).  When the system reaches xidStopLimit,
- * there are two possible counts of page boundaries between oldestXact and the
- * latest XID assigned, depending on whether oldestXact is within the first
- * 128 entries of its page.  Since this function doesn't know the location of
- * oldestXact within page2, it returns false for one page that actually is
- * expendable.  This is a wider (yet still negligible) version of the
- * truncation opportunity that CLOGPagePrecedes() cannot recognize.
- *
- * For the sake of a worked example, number entries with decimal values such
- * that page1==1 entries range from 1.0 to 1.999.  Let N+0.15 be the number of
- * pages that 2^31 entries will span (N is an integer).  If oldestXact=N+2.1,
- * then the final safe XID assignment leaves newestXact=1.95.  We keep page 2,
- * because entry=2.85 is the border that toggles whether entries precede the
- * last entry of the oldestXact page.  While page 2 is expendable at
- * oldestXact=N+2.1, it would be precious at oldestXact=N+2.9.
  */
 static bool
 CommitTsPagePrecedes(int64 page1, int64 page2)

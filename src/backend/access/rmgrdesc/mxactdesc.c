@@ -65,9 +65,9 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 		xl_multixact_create *xlrec = (xl_multixact_create *) rec;
 		int			i;
 
-		appendStringInfo(buf, "%llu offset %u nmembers %d: ",
+		appendStringInfo(buf, "%llu offset %llu nmembers %d: ",
 						 (unsigned long long) xlrec->mid,
-						 xlrec->moff, xlrec->nmembers);
+						 (unsigned long long) xlrec->moff, xlrec->nmembers);
 		for (i = 0; i < xlrec->nmembers; i++)
 			out_member(buf, &xlrec->members[i]);
 	}
@@ -75,10 +75,11 @@ multixact_desc(StringInfo buf, XLogReaderState *record)
 	{
 		xl_multixact_truncate *xlrec = (xl_multixact_truncate *) rec;
 
-		appendStringInfo(buf, "offsets [%llu, %llu), members [%u, %u)",
+		appendStringInfo(buf, "offsets [%llu, %llu), members [%llu, %llu)",
 						 (unsigned long long) xlrec->startTruncOff,
 						 (unsigned long long) xlrec->endTruncOff,
-						 xlrec->startTruncMemb, xlrec->endTruncMemb);
+						 (unsigned long long) xlrec->startTruncMemb,
+						 (unsigned long long) xlrec->endTruncMemb);
 	}
 }
 

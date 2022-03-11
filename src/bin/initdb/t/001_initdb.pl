@@ -149,28 +149,28 @@ command_fails(
 
 # Set non-standard initial mxid/mxoff/xid.
 command_fails_like(
-	[ 'initdb', '-m', '4294967296', $datadir ],
+	[ 'initdb', '-m', '9223372036854775807', $datadir ],
 	qr/initdb: error: invalid initial database cluster multixact id/,
 	'fails for invalid initial database cluster multixact id');
 command_fails_like(
-	[ 'initdb', '-o', '4294967296', $datadir ],
+	[ 'initdb', '-o', '9223372036854775807', $datadir ],
 	qr/initdb: error: invalid initial database cluster multixact offset/,
 	'fails for invalid initial database cluster multixact offset');
 command_fails_like(
-	[ 'initdb', '-x', '4294967296', $datadir ],
+	[ 'initdb', '-x', '9223372036854775807', $datadir ],
 	qr/initdb: error: invalid value for initial database cluster xid/,
 	'fails for invalid initial database cluster xid');
 
 command_fails_like(
-	[ 'initdb', '-m', '0x100000000', $datadir ],
+	[ 'initdb', '-m', '0x10000000000000000', $datadir ],
 	qr/initdb: error: invalid initial database cluster multixact id/,
 	'fails for invalid initial database cluster multixact id');
 command_fails_like(
-	[ 'initdb', '-o', '0x100000000', $datadir ],
+	[ 'initdb', '-o', '0x10000000000000000', $datadir ],
 	qr/initdb: error: invalid initial database cluster multixact offset/,
 	'fails for invalid initial database cluster multixact offset');
 command_fails_like(
-	[ 'initdb', '-x', '0x100000000', $datadir ],
+	[ 'initdb', '-x', '0x10000000000000000', $datadir ],
 	qr/initdb: error: invalid value for initial database cluster xid/,
 	'fails for invalid initial database cluster xid');
 

@@ -165,7 +165,7 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 	nulls[5] = false;
 
 	values[6] = CStringGetTextDatum(psprintf("%llu",
-											 (unsigned long long) U64FromFullTransactionId(ControlFile->checkPointCopy.nextXid)));
+											 (unsigned long long) XidFromFullTransactionId(ControlFile->checkPointCopy.nextXid)));
 	nulls[6] = false;
 
 	values[7] = ObjectIdGetDatum(ControlFile->checkPointCopy.nextOid);

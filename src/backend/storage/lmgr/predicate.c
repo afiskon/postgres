@@ -334,9 +334,9 @@ static SlruCtlData SerialSlruCtlData;
 
 #define SerialValue(slotno, xid) (*((SerCommitSeqNo *) \
 	(SerialSlruCtl->shared->page_buffer[slotno] + \
-	((((uint32) (xid)) % SERIAL_ENTRIESPERPAGE) * SERIAL_ENTRYSIZE))))
+	((((uint64) (xid)) % SERIAL_ENTRIESPERPAGE) * SERIAL_ENTRYSIZE))))
 
-#define SerialPage(xid)	(((uint32) (xid)) / SERIAL_ENTRIESPERPAGE)
+#define SerialPage(xid)		((int64) (((uint64) (xid)) / SERIAL_ENTRIESPERPAGE))
 
 typedef struct SerialControlData
 {
@@ -1090,31 +1090,6 @@ CheckPointPredicate(void)
 		/*----------
 		 * The SLRU is no longer needed. Truncate to head before we set head
 		 * invalid.
-		 *
-		 * XXX: It's possible that the SLRU is not needed again until XID
-		 * wrap-around has happened, so that the segment containing headPage
-		 * that we leave behind will appear to be new again. In that case it
-		 * won't be removed until XID horizon advances enough to make it
-		 * current again.
-		 *
-		 * XXX: This should happen in vac_truncate_clog(), not in checkpoints.
-		 * Consider this scenario, starting from a system with no in-progress
-		 * transactions and VACUUM FREEZE having maximized oldestXact:
-		 * - Start a SERIALIZABLE transaction.
-		 * - Start, finish, and summarize a SERIALIZABLE transaction, creating
-		 *   one SLRU page.
-		 * - Consume XIDs to reach xidStopLimit.
-		 * - Finish all transactions.  Due to the long-running SERIALIZABLE
-		 *   transaction, earlier checkpoints did not touch headPage.  The
-		 *   next checkpoint will change it, but that checkpoint happens after
-		 *   the end of the scenario.
-		 * - VACUUM to advance XID limits.
-		 * - Consume ~2M XIDs, crossing the former xidWrapLimit.
-		 * - Start, finish, and summarize a SERIALIZABLE transaction.
-		 *   SerialAdd() declines to create the targetPage, because headPage
-		 *   is not regarded as in the past relative to that targetPage.  The
-		 *   transaction instigating the summarize fails in
-		 *   SimpleLruReadPage().
 		 */
 		tailPage = serialControl->headPage;
 		serialControl->headPage = -1;
@@ -4078,7 +4053,7 @@ XidIsConcurrent(TransactionId xid)
 	if (TransactionIdFollowsOrEquals(xid, snap->xmax))
 		return true;
 
-	return pg_lfind32(xid, snap->xip, snap->xcnt);
+	return pg_lfind64(xid, snap->xip, snap->xcnt);
 }
 
 bool

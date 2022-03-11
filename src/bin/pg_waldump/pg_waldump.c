@@ -919,7 +919,7 @@ main(int argc, char **argv)
 				config.filter_by_fpw = true;
 				break;
 			case 'x':
-				if (sscanf(optarg, "%u", &config.filter_by_xid) != 1)
+				if (sscanf(optarg, "%" INT64_MODIFIER "u", &config.filter_by_xid) != 1)
 				{
 					pg_log_error("invalid transaction ID specification: \"%s\"",
 								 optarg);

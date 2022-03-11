@@ -1305,7 +1305,7 @@ bootstrap_template1(void)
 							  escape_quotes_bki(username));
 
 	/* relfrozenxid must not be less than FirstNormalTransactionId */
-	sprintf(buf, "%u", Max(start_xid, 3));
+	sprintf(buf, "%llu", (unsigned long long) Max(start_xid, 3));
 	bki_lines = replace_token(bki_lines, "RECENTXMIN",
 							  buf);
 
@@ -1328,13 +1328,13 @@ bootstrap_template1(void)
 	unsetenv("PGCLIENTENCODING");
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" --boot -X %d %s %s %u %s %u %s %u %s %s %s",
+			 "\"%s\" --boot -X %d %s %s %llu %s %llu %s %llu %s %s %s",
 			 backend_exec,
 			 wal_segment_size_mb * (1024 * 1024),
 			 data_checksums ? "-k" : "",
-			 "-m", start_mxid,
-			 "-o", start_mxoff,
-			 "-x", start_xid,
+			 "-m", (unsigned long long) start_mxid,
+			 "-o", (unsigned long long) start_mxoff,
+			 "-x", (unsigned long long) start_xid,
 			 boot_options, extra_options,
 			 debug ? "-d 5" : "");
 
@@ -2177,15 +2177,18 @@ usage(const char *progname)
 	printf(_("      --discard-caches      set debug_discard_caches=1\n"));
 	printf(_("  -L DIRECTORY              where to find the input files\n"));
 	printf(_("  -m, --multixact-id=START_MXID\n"
-			 "                            set initial database cluster multixact id\n"));
+			 "                            set initial database cluster multixact id\n"
+			 "                            max value is 2^62-1\n"));
 	printf(_("  -n, --no-clean            do not clean up after errors\n"));
 	printf(_("  -N, --no-sync             do not wait for changes to be written safely to disk\n"));
 	printf(_("      --no-instructions     do not print instructions for next steps\n"));
 	printf(_("  -o, --multixact-offset=START_MXOFF\n"
-			 "                            set initial database cluster multixact offset\n"));
+			 "                            set initial database cluster multixact offset\n"
+			 "                            max value is 2^62-1"));
 	printf(_("  -s, --show                show internal settings\n"));
 	printf(_("  -S, --sync-only           only sync database files to disk, then exit\n"));
-	printf(_("  -x, --xid=START_XID       set initial database cluster xid\n"));
+	printf(_("  -x, --xid=START_XID       set initial database cluster xid\n"
+			 "                            max value is 2^62-1\n"));
 	printf(_("\nOther options:\n"));
 	printf(_("  -V, --version             output version information, then exit\n"));
 	printf(_("  -?, --help                show this help, then exit\n"));
@@ -2723,13 +2726,16 @@ initialize_data_directory(void)
 	setup_config();
 
 	if (start_mxid != 0)
-		printf(_("selecting initial multixact id ... %u\n"), start_mxid);
+		printf(_("selecting initial multixact id ... %llu\n"),
+				 (unsigned long long) start_mxid);
 
 	if (start_mxoff != 0)
-		printf(_("selecting initial multixact offset ... %u\n"), start_mxoff);
+		printf(_("selecting initial multixact offset ... %llu\n"),
+				 (unsigned long long) start_mxoff);
 
 	if (start_xid != 0)
-		printf(_("selecting initial xid ... %u\n"), start_xid);
+		printf(_("selecting initial xid ... %llu\n"),
+				 (unsigned long long) start_xid);
 
 	/* Bootstrap template1 */
 	bootstrap_template1();
@@ -2747,11 +2753,11 @@ initialize_data_directory(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s %s %s %u %s %u %s %u template1 >%s",
+			 "\"%s\" %s %s %s %llu %s %llu %s %llu template1 >%s",
 			 backend_exec, backend_options, extra_options,
-			 "-m", start_mxid,
-			 "-o", start_mxoff,
-			 "-x", start_xid,
+			 "-m", (unsigned long long) start_mxid,
+			 "-o", (unsigned long long) start_mxoff,
+			 "-x", (unsigned long long) start_xid,
 			 DEVNULL);
 
 	PG_CMD_OPEN;
@@ -2918,15 +2924,13 @@ main(int argc, char *argv[])
 				break;
 			case 'm':
 				{
-					unsigned long	value;
-					char		   *endptr;
+					char	   *endptr;
 
 					errno = 0;
-					value = strtoul(optarg, &endptr, 0);
-					start_mxid = value;
+					start_mxid = strtoull(optarg, &endptr, 0);
 
 					if (endptr == optarg || *endptr != '\0' || errno != 0 ||
-						value != start_mxid) /* overflow */
+						!StartMultiXactIdIsValid(start_mxid))
 					{
 						pg_log_error("invalid initial database cluster multixact id");
 						exit(1);
@@ -2951,15 +2955,13 @@ main(int argc, char *argv[])
 				break;
 			case 'o':
 				{
-					unsigned long	value;
-					char		   *endptr;
+					char	   *endptr;
 
 					errno = 0;
-					value = strtoul(optarg, &endptr, 0);
-					start_mxoff = value;
+					start_mxoff = strtoull(optarg, &endptr, 0);
 
 					if (endptr == optarg || *endptr != '\0' || errno != 0 ||
-						value != start_mxoff) /* overflow */
+						!StartMultiXactOffsetIsValid(start_mxoff))
 					{
 						pg_log_error("invalid initial database cluster multixact offset");
 						exit(1);
@@ -3038,15 +3040,13 @@ main(int argc, char *argv[])
 				break;
 			case 'x':
 				{
-					unsigned long	value;
-					char		   *endptr;
+					char	   *endptr;
 
 					errno = 0;
-					value = strtoul(optarg, &endptr, 0);
-					start_xid = value;
+					start_xid = strtoull(optarg, &endptr, 0);
 
 					if (endptr == optarg || *endptr != '\0' || errno != 0 ||
-						value != start_xid) /* overflow */
+						!StartTransactionIdIsValid(start_xid))
 					{
 						pg_log_error("invalid value for initial database cluster xid");
 						exit(1);

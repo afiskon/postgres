@@ -940,6 +940,14 @@ build_guc_variables(void)
 		num_vars++;
 	}
 
+	for (i = 0; ConfigureNamesInt64[i].gen.name; i++)
+	{
+		struct config_int64 *conf = &ConfigureNamesInt64[i];
+
+		conf->gen.vartype = PGC_INT64;
+		num_vars++;
+	}
+
 	for (i = 0; ConfigureNamesReal[i].gen.name; i++)
 	{
 		struct config_real *conf = &ConfigureNamesReal[i];
@@ -1413,6 +1421,7 @@ check_GUC_name_for_parameter_acl(const char *name)
  * The following validation rules apply:
  * bool - can be false, otherwise must be same as the boot_val
  * int  - can be 0, otherwise must be same as the boot_val
+ * int64 - can be 0, otherwise must be same as the boot_val
  * real - can be 0.0, otherwise must be same as the boot_val
  * string - can be NULL, otherwise must be strcmp equal to the boot_val
  * enum - must be same as the boot_val
@@ -1443,6 +1452,20 @@ check_GUC_init(struct config_generic *gconf)
 				{
 					elog(LOG, "GUC (PGC_INT) %s, boot_val=%d, C-var=%d",
 						 conf->gen.name, conf->boot_val, *conf->variable);
+					return false;
+				}
+				break;
+			}
+		case PGC_INT64:
+			{
+				struct config_int64 *conf = (struct config_int64 *) gconf;
+
+				if (*conf->variable != 0 && *conf->variable != conf->boot_val)
+				{
+					elog(LOG, "GUC (PGC_INT64) %s, boot_val=%lld, C-var=%lld",
+						 conf->gen.name,
+						 (long long) conf->boot_val,
+						 (long long) *conf->variable);
 					return false;
 				}
 				break;

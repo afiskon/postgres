@@ -5101,8 +5101,12 @@ UpdateLogicalMappings(HTAB *tuplecid_data, Oid relid, Snapshot snapshot)
 		TransactionId f_mapped_xid;
 		TransactionId f_create_xid;
 		XLogRecPtr	f_lsn;
-		uint32		f_hi,
-					f_lo;
+		uint32		f_lsn_hi,
+					f_lsn_lo,
+					f_mapped_xid_hi,
+					f_mapped_xid_lo,
+					f_create_xid_hi,
+					f_create_xid_lo;
 		RewriteMappingFile *f;
 
 		if (strcmp(mapping_de->d_name, ".") == 0 ||
@@ -5114,11 +5118,14 @@ UpdateLogicalMappings(HTAB *tuplecid_data, Oid relid, Snapshot snapshot)
 			continue;
 
 		if (sscanf(mapping_de->d_name, LOGICAL_REWRITE_FORMAT,
-				   &f_dboid, &f_relid, &f_hi, &f_lo,
-				   &f_mapped_xid, &f_create_xid) != 6)
+				   &f_dboid, &f_relid, &f_lsn_hi, &f_lsn_lo,
+				   &f_mapped_xid_hi, &f_mapped_xid_lo,
+				   &f_create_xid_hi, &f_create_xid_lo) != 8)
 			elog(ERROR, "could not parse filename \"%s\"", mapping_de->d_name);
 
-		f_lsn = ((uint64) f_hi) << 32 | f_lo;
+		f_lsn = ((uint64) f_lsn_hi) << 32 | f_lsn_lo;
+		f_mapped_xid = ((uint64) f_mapped_xid_hi) << 32 | f_mapped_xid_lo;
+		f_create_xid = ((uint64) f_create_xid_hi) << 32 | f_create_xid_lo;
 
 		/* mapping for another database */
 		if (f_dboid != dboid)

@@ -187,7 +187,7 @@ typedef struct AsyncQueueEntry
 } AsyncQueueEntry;
 
 /* Currently, no field of AsyncQueueEntry requires more than int alignment */
-#define QUEUEALIGN(len)		INTALIGN(len)
+#define QUEUEALIGN(len)		TYPEALIGN(8, len)
 
 #define AsyncQueueEntryEmptySize	(offsetof(AsyncQueueEntry, data) + 2)
 

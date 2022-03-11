@@ -77,7 +77,7 @@ VXIDGetDatum(BackendId bid, LocalTransactionId lxid)
 	 * The representation is "<bid>/<lxid>", decimal and unsigned decimal
 	 * respectively.  Note that elog.c also knows how to format a vxid.
 	 */
-	char		vxidstr[32];
+	char		vxidstr[64];
 
 	snprintf(vxidstr, sizeof(vxidstr), "%d/%llu", bid,
 			 (unsigned long long) lxid);
@@ -291,7 +291,9 @@ pg_lock_status(PG_FUNCTION_ARGS)
 				break;
 			case LOCKTAG_TRANSACTION:
 				values[6] =
-					TransactionIdGetDatum(instance->locktag.locktag_field1);
+					TransactionIdGetDatum(
+										  (TransactionId) instance->locktag.locktag_field1 |
+										  ((TransactionId) instance->locktag.locktag_field2 << 32));
 				nulls[1] = true;
 				nulls[2] = true;
 				nulls[3] = true;
@@ -303,7 +305,8 @@ pg_lock_status(PG_FUNCTION_ARGS)
 				break;
 			case LOCKTAG_VIRTUALTRANSACTION:
 				values[5] = VXIDGetDatum(instance->locktag.locktag_field1,
-										 instance->locktag.locktag_field2);
+										 (TransactionId) instance->locktag.locktag_field2 |
+										 ((TransactionId) instance->locktag.locktag_field3 << 32));
 				nulls[1] = true;
 				nulls[2] = true;
 				nulls[3] = true;
