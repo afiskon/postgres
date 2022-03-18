@@ -309,8 +309,8 @@ msgstr "activé"
 
 #: pg_resetwal.c:758
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "Dernier NextXID du point de contrôle :                  %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "Dernier NextXID du point de contrôle :                  %u:%llu\n"
 
 #: pg_resetwal.c:761
 #, c-format
@@ -319,8 +319,8 @@ msgstr "Dernier NextOID du point de contrôle :                  %u\n"
 
 #: pg_resetwal.c:763
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "Dernier NextMultiXactId du point de contrôle :          %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "Dernier NextMultiXactId du point de contrôle :          %llu\n"
 
 #: pg_resetwal.c:765
 #, c-format
@@ -329,8 +329,8 @@ msgstr "Dernier NextMultiOffset du point de contrôle :          %u\n"
 
 #: pg_resetwal.c:767
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "Dernier oldestXID du point de contrôle :                %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "Dernier oldestXID du point de contrôle :                %llu\n"
 
 #: pg_resetwal.c:769
 #, c-format
@@ -339,13 +339,13 @@ msgstr "Dernier oldestXID du point de contrôle de la base :     %u\n"
 
 #: pg_resetwal.c:771
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "Dernier oldestActiveXID du point de contrôle :          %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "Dernier oldestActiveXID du point de contrôle :          %llu\n"
 
 #: pg_resetwal.c:773
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "Dernier oldestMultiXID du point de contrôle :           %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "Dernier oldestMultiXID du point de contrôle :           %llu\n"
 
 #: pg_resetwal.c:775
 #, c-format
@@ -354,13 +354,13 @@ msgstr "Dernier oldestMulti du point de contrôle de la base :     %u\n"
 
 #: pg_resetwal.c:777
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "Dernier oldestCommitTsXid du point de contrôle :        %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "Dernier oldestCommitTsXid du point de contrôle :        %llu\n"
 
 #: pg_resetwal.c:779
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "Dernier newestCommitTsXid du point de contrôle :        %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "Dernier newestCommitTsXid du point de contrôle :        %llu\n"
 
 #: pg_resetwal.c:781
 #, c-format

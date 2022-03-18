@@ -290,8 +290,8 @@ msgstr "on"
 
 #: pg_controldata.c:252
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "마지막 체크포인트 NextXID:            %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "마지막 체크포인트 NextXID:            %u:%llu\n"
 
 #: pg_controldata.c:255
 #, c-format
@@ -300,8 +300,8 @@ msgstr "마지막 체크포인트 NextOID:            %u\n"
 
 #: pg_controldata.c:257
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "마지막 체크포인트 NextMultiXactId:    %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "마지막 체크포인트 NextMultiXactId:    %llu\n"
 
 #: pg_controldata.c:259
 #, c-format
@@ -310,8 +310,8 @@ msgstr "마지막 체크포인트 NextMultiOffset:    %u\n"
 
 #: pg_controldata.c:261
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "마지막 체크포인트 제일오래된XID:      %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "마지막 체크포인트 제일오래된XID:      %llu\n"
 
 #: pg_controldata.c:263
 #, c-format
@@ -320,13 +320,13 @@ msgstr "마지막 체크포인트 제일오래된XID의 DB: %u\n"
 
 #: pg_controldata.c:265
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "마지막 체크포인트 제일오래된ActiveXID:%u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "마지막 체크포인트 제일오래된ActiveXID: %llu\n"
 
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "마지막 체크포인트 제일오래된MultiXid: %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "마지막 체크포인트 제일오래된MultiXid: %llu\n"
 
 #: pg_controldata.c:269
 #, c-format
@@ -335,13 +335,13 @@ msgstr "마지막 체크포인트 제일오래된멀티Xid DB:%u\n"
 
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "마지막 체크포인트 제일오래된CommitTsXid:%u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "마지막 체크포인트 제일오래된CommitTsXid:%llu\n"
 
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "마지막 체크포인트 최신CommitTsXid:    %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "마지막 체크포인트 최신CommitTsXid:    %llu\n"
 
 #: pg_controldata.c:275
 #, c-format

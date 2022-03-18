@@ -265,8 +265,8 @@ msgstr "увімк"
 
 #: pg_controldata.c:252
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "Останній NextXID контрольної точки: %u%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "Останній NextXID контрольної точки: %u:%llu\n"
 
 #: pg_controldata.c:255
 #, c-format
@@ -275,8 +275,8 @@ msgstr "Останній NextOID контрольної точки: %u\n"
 
 #: pg_controldata.c:257
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "Останній NextMultiXactId контрольної точки: %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "Останній NextMultiXactId контрольної точки: %llu\n"
 
 #: pg_controldata.c:259
 #, c-format
@@ -285,8 +285,8 @@ msgstr "Останній NextMultiOffset контрольної точки: %u\n
 
 #: pg_controldata.c:261
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "Останній oldestXID контрольної точки: %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "Останній oldestXID контрольної точки: %llu\n"
 
 #: pg_controldata.c:263
 #, c-format
@@ -295,13 +295,13 @@ msgstr "Остання DB останнього oldestXID контрольної 
 
 #: pg_controldata.c:265
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "Останній oldestActiveXID контрольної точки: %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "Останній oldestActiveXID контрольної точки: %llu\n"
 
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "Останній oldestMultiXid контрольної точки: %u \n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "Останній oldestMultiXid контрольної точки: %llu\n"
 
 #: pg_controldata.c:269
 #, c-format
@@ -310,13 +310,13 @@ msgstr "Остання DB останньої oldestMulti контрольної 
 
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "Останній oldestCommitTsXid контрольної точки:%u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "Останній oldestCommitTsXid контрольної точки:%llu\n"
 
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "Останній newestCommitTsXid контрольної точки: %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "Останній newestCommitTsXid контрольної точки: %llu\n"
 
 #: pg_controldata.c:275
 #, c-format

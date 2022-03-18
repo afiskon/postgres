@@ -244,8 +244,8 @@ msgstr "włączone"
 
 #: pg_controldata.c:228
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID najnowszego punktu kontrolnego:          %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID najnowszego punktu kontrolnego:          %u:%llu\n"
 
 #: pg_controldata.c:231
 #, c-format
@@ -254,8 +254,8 @@ msgstr "NextOID najnowszego punktu kontrolnego:          %u\n"
 
 #: pg_controldata.c:233
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId najnowszego punktu kontrolnego:  %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId najnowszego punktu kontrolnego:  %llu\n"
 
 #: pg_controldata.c:235
 #, c-format
@@ -264,8 +264,8 @@ msgstr "NextMultiOffset najnowszego punktu kontrolnego:  %u\n"
 
 #: pg_controldata.c:237
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "NextXID najnowszego punktu kontrolnego:          %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "NextXID najnowszego punktu kontrolnego:          %llu\n"
 
 #: pg_controldata.c:239
 #, c-format
@@ -274,13 +274,13 @@ msgstr "DB oldestXID'u najnowszego punktu kontrolnego:   %u\n"
 
 #: pg_controldata.c:241
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID najnowszego punktu kontrolnego:  %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID najnowszego punktu kontrolnego:  %llu\n"
 
 #: pg_controldata.c:243
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid najnowszego punktu kontrolnego:   %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid najnowszego punktu kontrolnego:   %llu\n"
 
 #: pg_controldata.c:245
 #, c-format
@@ -289,13 +289,13 @@ msgstr "DB oldestMulti'u najnowszego punktu kontrolnego: %u\n"
 
 #: pg_controldata.c:247
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid najnowszego punktu kontrolnego: %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid najnowszego punktu kontrolnego: %llu\n"
 
 #: pg_controldata.c:249
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid najnowszego punktu kontrolnego: %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid najnowszego punktu kontrolnego: %llu\n"
 
 #: pg_controldata.c:251
 #, c-format

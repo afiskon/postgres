@@ -301,8 +301,8 @@ msgstr "オン"
 
 #: pg_controldata.c:252
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "最終チェックポイントのNextXID:               %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "最終チェックポイントのNextXID:               %u:%llu\n"
 
 #: pg_controldata.c:255
 #, c-format
@@ -311,8 +311,8 @@ msgstr "最終チェックポイントのNextOID:               %u\n"
 
 #: pg_controldata.c:257
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "最終チェックポイントのNextMultiXactId:       %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "最終チェックポイントのNextMultiXactId:       %llu\n"
 
 #: pg_controldata.c:259
 #, c-format
@@ -321,8 +321,8 @@ msgstr "最終チェックポイントのNextMultiOffset:       %u\n"
 
 #: pg_controldata.c:261
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "最終チェックポイントのoldestXID:             %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "最終チェックポイントのoldestXID:             %llu\n"
 
 #: pg_controldata.c:263
 #, c-format
@@ -331,13 +331,13 @@ msgstr "最終チェックポイントのoldestXIDのDB:         %u\n"
 
 #: pg_controldata.c:265
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "最終チェックポイントのoldestActiveXID:       %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "最終チェックポイントのoldestActiveXID:       %llu\n"
 
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "最終チェックポイントのoldestMultiXid:        %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "最終チェックポイントのoldestMultiXid:        %llu\n"
 
 #: pg_controldata.c:269
 #, c-format
@@ -346,13 +346,13 @@ msgstr "最終チェックポイントのoldestMultiのDB:       %u\n"
 
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "最終チェックポイントのoldestCommitTsXid:     %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "最終チェックポイントのoldestCommitTsXid:     %llu\n"
 
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "最終チェックポイントのnewestCommitTsXid:     %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "最終チェックポイントのnewestCommitTsXid:     %llu\n"
 
 #: pg_controldata.c:275
 #, c-format

@@ -298,8 +298,8 @@ msgstr "açık"
 
 #: pg_controldata.c:258
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "En son checkpoint'in NextXID'si:          %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "En son checkpoint'in NextXID'si:          %u:%llu\n"
 
 #: pg_controldata.c:261
 #, c-format
@@ -308,8 +308,8 @@ msgstr "En son checkpoint'in NextOID'si:          %u\n"
 
 #: pg_controldata.c:263
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "En son checkpoint'in NextMultiXactId'si:          %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "En son checkpoint'in NextMultiXactId'si:          %llu\n"
 
 #: pg_controldata.c:265
 #, c-format
@@ -318,8 +318,8 @@ msgstr "En son checkpoint'in NextMultiOffset'i:  %u\n"
 
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "En son checkpoint'in oldestXID'si:          %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "En son checkpoint'in oldestXID'si:          %llu\n"
 
 #: pg_controldata.c:269
 #, c-format
@@ -328,13 +328,13 @@ msgstr "En son checkpoint'in oldestXID'sini DB'si:          %u\n"
 
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "En son checkpoint'in odestActiveXID'si:          %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "En son checkpoint'in odestActiveXID'si:          %llu\n"
 
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "En son checkpoint'in oldestMultiXid'si:   %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "En son checkpoint'in oldestMultiXid'si:   %llu\n"
 
 #: pg_controldata.c:275
 #, c-format
@@ -343,13 +343,13 @@ msgstr "En son checkpoint'in oldestMulti'sinin DB'si: %u\n"
 
 #: pg_controldata.c:277
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "En son checkpoint'in oldestCommitTsXid'si: %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "En son checkpoint'in oldestCommitTsXid'si: %llu\n"
 
 #: pg_controldata.c:279
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "En son checkpoint'in newestCommitTsXid'si: %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "En son checkpoint'in newestCommitTsXid'si: %llu\n"
 
 #: pg_controldata.c:281
 #, c-format

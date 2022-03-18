@@ -317,8 +317,8 @@ msgstr "вкл."
 # skip-rule: capital-letter-first
 #: pg_controldata.c:252
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID последней конт. точки:        %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID последней конт. точки:        %u:%llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_controldata.c:255
@@ -329,8 +329,8 @@ msgstr "NextOID последней конт. точки:        %u\n"
 # skip-rule: capital-letter-first
 #: pg_controldata.c:257
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId послед. конт. точки:  %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId послед. конт. точки:  %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_controldata.c:259
@@ -341,8 +341,8 @@ msgstr "NextMultiOffset послед. конт. точки:  %u\n"
 # skip-rule: capital-letter-first
 #: pg_controldata.c:261
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "oldestXID последней конт. точки:      %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "oldestXID последней конт. точки:      %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_controldata.c:263
@@ -353,14 +353,14 @@ msgstr "БД с oldestXID последней конт. точки: %u\n"
 # skip-rule: capital-letter-first
 #: pg_controldata.c:265
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID последней к. т.:      %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID последней к. т.:      %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid последней конт. точки: %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid последней конт. точки: %llu\n"
 
 # skip-rule: double-space, capital-letter-first
 #: pg_controldata.c:269
@@ -371,14 +371,14 @@ msgstr "БД с oldestMulti последней к. т.:     %u\n"
 # skip-rule: double-space, capital-letter-first
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid последней к. т.:    %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid последней к. т.:    %llu\n"
 
 # skip-rule: capital-letter-first, double-space
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid последней к. т.:    %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid последней к. т.:    %llu\n"
 
 #: pg_controldata.c:275
 #, c-format

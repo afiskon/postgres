@@ -298,8 +298,8 @@ msgstr "开启"
 
 #: pg_resetwal.c:775
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "最新检查点的NextXID:          %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "最新检查点的NextXID:          %u:%llu\n"
 
 #: pg_resetwal.c:778
 #, c-format
@@ -308,8 +308,8 @@ msgstr "最新检查点的 NextOID:                 %u\n"
 
 #: pg_resetwal.c:780
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "最新检查点的NextMultiXactId: %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "最新检查点的NextMultiXactId: %llu\n"
 
 #: pg_resetwal.c:782
 #, c-format
@@ -318,8 +318,8 @@ msgstr "最新检查点的NextMultiOffsetD: %u\n"
 
 #: pg_resetwal.c:784
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "最新检查点的oldestXID:            %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "最新检查点的oldestXID:            %llu\n"
 
 #: pg_resetwal.c:786
 #, c-format
@@ -328,13 +328,13 @@ msgstr "最新检查点的oldestXID所在的数据库：%u\n"
 
 #: pg_resetwal.c:788
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "最新检查点的oldestActiveXID:  %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "最新检查点的oldestActiveXID:  %llu\n"
 
 #: pg_resetwal.c:790
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "最新检查点的oldestMultiXid:  %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "最新检查点的oldestMultiXid:  %llu\n"
 
 #: pg_resetwal.c:792
 #, c-format
@@ -343,13 +343,13 @@ msgstr "最新检查点的oldestMulti所在的数据库：%u\n"
 
 #: pg_resetwal.c:794
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "最新检查点的oldestCommitTsXid:%u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "最新检查点的oldestCommitTsXid:%llu\n"
 
 #: pg_resetwal.c:796
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "最新检查点的newestCommitTsXid:%u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "最新检查点的newestCommitTsXid:%llu\n"
 
 #: pg_resetwal.c:798
 #, c-format

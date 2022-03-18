@@ -307,8 +307,8 @@ msgstr "zapnuto"
 
 #: pg_resetwal.c:758
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID posledního checkpointu:            %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID posledního checkpointu:            %u:%llu\n"
 
 #: pg_resetwal.c:761
 #, c-format
@@ -317,8 +317,8 @@ msgstr "Poslední umístění NextOID checkpointu:     %u\n"
 
 #: pg_resetwal.c:763
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId posledního checkpointu:    %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId posledního checkpointu:    %llu\n"
 
 #: pg_resetwal.c:765
 #, c-format
@@ -327,8 +327,8 @@ msgstr "NextMultiOffset posledního checkpointu:    %u\n"
 
 #: pg_resetwal.c:767
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "oldestXID posledního checkpointu:          %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "oldestXID posledního checkpointu:          %llu\n"
 
 #: pg_resetwal.c:769
 #, c-format
@@ -337,13 +337,13 @@ msgstr "DB k oldestXID posledního checkpointu:     %u\n"
 
 #: pg_resetwal.c:771
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID posledního checkpointu:    %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID posledního checkpointu:    %llu\n"
 
 #: pg_resetwal.c:773
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid posledního checkpointu:     %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid posledního checkpointu:     %llu\n"
 
 #: pg_resetwal.c:775
 #, c-format
@@ -352,13 +352,13 @@ msgstr "DB k oldestMulti posledního checkpointu:   %u\n"
 
 #: pg_resetwal.c:777
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid posledního checkpointu:  %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid posledního checkpointu:  %llu\n"
 
 #: pg_resetwal.c:779
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid posledního checkpointu:  %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid posledního checkpointu:  %llu\n"
 
 #: pg_resetwal.c:781
 #, c-format

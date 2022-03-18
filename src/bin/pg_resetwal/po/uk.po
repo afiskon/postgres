@@ -291,8 +291,8 @@ msgstr "увімк"
 
 #: pg_resetwal.c:758
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "Останній NextXID контрольної точки: %u%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "Останній NextXID контрольної точки: %u:%llu\n"
 
 #: pg_resetwal.c:761
 #, c-format
@@ -301,8 +301,8 @@ msgstr "Останній NextOID контрольної точки: %u\n"
 
 #: pg_resetwal.c:763
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "Останній NextMultiXactId контрольної точки: %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "Останній NextMultiXactId контрольної точки: %llu\n"
 
 #: pg_resetwal.c:765
 #, c-format
@@ -311,8 +311,8 @@ msgstr "Останній NextMultiOffset контрольної точки: %u\n
 
 #: pg_resetwal.c:767
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "Останній oldestXID контрольної точки: %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "Останній oldestXID контрольної точки: %llu\n"
 
 #: pg_resetwal.c:769
 #, c-format
@@ -321,13 +321,13 @@ msgstr "Остання DB останнього oldestXID контрольної 
 
 #: pg_resetwal.c:771
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "Останній oldestActiveXID контрольної точки: %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "Останній oldestActiveXID контрольної точки: %llu\n"
 
 #: pg_resetwal.c:773
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "Останній oldestMultiXid контрольної точки: %u \n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "Останній oldestMultiXid контрольної точки: %llu\n"
 
 #: pg_resetwal.c:775
 #, c-format
@@ -336,13 +336,13 @@ msgstr "Остання DB останньої oldestMulti контрольної 
 
 #: pg_resetwal.c:777
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "Останній oldestCommitTsXid контрольної точки:%u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "Останній oldestCommitTsXid контрольної точки:%llu\n"
 
 #: pg_resetwal.c:779
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "Останній newestCommitTsXid контрольної точки: %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "Останній newestCommitTsXid контрольної точки: %llu\n"
 
 #: pg_resetwal.c:781
 #, c-format

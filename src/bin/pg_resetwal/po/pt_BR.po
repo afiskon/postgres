@@ -246,8 +246,8 @@ msgstr "habilitado"
 
 #: pg_resetxlog.c:649
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID do último ponto de controle:               %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID do último ponto de controle:               %u:%llu\n"
 
 #: pg_resetxlog.c:652
 #, c-format
@@ -256,8 +256,8 @@ msgstr "NextOID do último ponto de controle:               %u\n"
 
 #: pg_resetxlog.c:654
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId do último ponto de controle:       %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId do último ponto de controle:       %llu\n"
 
 #: pg_resetxlog.c:656
 #, c-format
@@ -266,8 +266,8 @@ msgstr "NextMultiOffset do último ponto de controle:       %u\n"
 
 #: pg_resetxlog.c:658
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "oldestXID do último ponto de controle:             %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "oldestXID do último ponto de controle:             %llu\n"
 
 #: pg_resetxlog.c:660
 #, c-format
@@ -276,13 +276,13 @@ msgstr "BD do oldestXID do último ponto de controle:       %u\n"
 
 #: pg_resetxlog.c:662
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID do último ponto de controle:       %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID do último ponto de controle:       %llu\n"
 
 #: pg_resetxlog.c:664
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid do último ponto de controle:        %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid do último ponto de controle:        %llu\n"
 
 #: pg_resetxlog.c:666
 #, c-format
@@ -291,13 +291,13 @@ msgstr "BD do oldestMulti do último ponto de controle:     %u\n"
 
 #: pg_resetxlog.c:668
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid do último ponto de controle:     %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid do último ponto de controle:     %llu\n"
 
 #: pg_resetxlog.c:670
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid do último ponto de controle:     %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid do último ponto de controle:     %llu\n"
 
 #: pg_resetxlog.c:672
 #, c-format

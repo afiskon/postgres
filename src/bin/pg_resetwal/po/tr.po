@@ -300,8 +300,8 @@ msgstr "açık"
 
 #: pg_resetwal.c:775
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "Son checkpoint'in NextXID değeri:          %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "Son checkpoint'in NextXID değeri:          %u:%llu\n"
 
 #: pg_resetwal.c:778
 #, c-format
@@ -310,8 +310,8 @@ msgstr "Son checkpoint''in NextOID değeri:          %u\n"
 
 #: pg_resetwal.c:780
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "Son checkpoint''in NextMultiXactId değeri:  %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "Son checkpoint''in NextMultiXactId değeri:  %llu\n"
 
 #: pg_resetwal.c:782
 #, c-format
@@ -320,8 +320,8 @@ msgstr "Son checkpoint''in NextMultiOffset değeri:  %u\n"
 
 #: pg_resetwal.c:784
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "Son checkpoint'in oldestXID değeri:          %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "Son checkpoint'in oldestXID değeri:          %llu\n"
 
 #: pg_resetwal.c:786
 #, c-format
@@ -330,13 +330,13 @@ msgstr "Son checkpoint'in oldestXID değeri'nin DB'si:          %u\n"
 
 #: pg_resetwal.c:788
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "Son checkpoint'in oldestActiveXID değeri:  %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "Son checkpoint'in oldestActiveXID değeri:  %llu\n"
 
 #: pg_resetwal.c:790
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "Son checkpoint'in oldestMultiXid değeri:  %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "Son checkpoint'in oldestMultiXid değeri:  %llu\n"
 
 #: pg_resetwal.c:792
 #, c-format
@@ -345,13 +345,13 @@ msgstr "Son checkpoint'in oldestMulti'sinin VT'si: %u\n"
 
 #: pg_resetwal.c:794
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "Son checkpoint'in oldestCommitTsXid değeri:  %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "Son checkpoint'in oldestCommitTsXid değeri:  %llu\n"
 
 #: pg_resetwal.c:796
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "Son checkpoint''in newestCommitTsXid değeri: %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "Son checkpoint''in newestCommitTsXid değeri: %llu\n"
 
 #: pg_resetwal.c:798
 #, c-format

@@ -308,8 +308,8 @@ msgstr "on"
 
 #: pg_resetwal.c:758
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "마지막 체크포인트 NextXID:            %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "마지막 체크포인트 NextXID:            %u:%llu\n"
 
 #: pg_resetwal.c:761
 #, c-format
@@ -318,8 +318,8 @@ msgstr "마지막 체크포인트 NextOID:            %u\n"
 
 #: pg_resetwal.c:763
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "마지막 체크포인트 NextMultiXactId:    %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "마지막 체크포인트 NextMultiXactId:    %llu\n"
 
 #: pg_resetwal.c:765
 #, c-format
@@ -328,8 +328,8 @@ msgstr "마지막 체크포인트 NextMultiOffset:    %u\n"
 
 #: pg_resetwal.c:767
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "마지막 체크포인트 제일 오래된 XID:    %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "마지막 체크포인트 제일 오래된 XID:    %llu\n"
 
 #: pg_resetwal.c:769
 #, c-format
@@ -338,13 +338,13 @@ msgstr "마지막 체크포인트 제일 오래된 XID의 DB:%u\n"
 
 #: pg_resetwal.c:771
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "마지막 체크포인트 제일 오래된 ActiveXID:%u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "마지막 체크포인트 제일 오래된 ActiveXID:%llu\n"
 
 #: pg_resetwal.c:773
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "마지막 체크포인트 제일 오래된 MultiXid:%u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "마지막 체크포인트 제일 오래된 MultiXid:%llu\n"
 
 #: pg_resetwal.c:775
 #, c-format
@@ -353,13 +353,13 @@ msgstr "마지막 체크포인트 제일 오래된 MultiXid의 DB:%u\n"
 
 #: pg_resetwal.c:777
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "마지막 체크포인트 제일 오래된 CommitTsXid:%u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "마지막 체크포인트 제일 오래된 CommitTsXid:%llu\n"
 
 #: pg_resetwal.c:779
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "마지막 체크포인트 최신 CommitTsXid:   %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "마지막 체크포인트 최신 CommitTsXid:   %llu\n"
 
 #: pg_resetwal.c:781
 #, c-format

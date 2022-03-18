@@ -329,8 +329,8 @@ msgstr "вкл."
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:758
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID последней конт. точки:        %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID последней конт. точки:        %u:%llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:761
@@ -341,8 +341,8 @@ msgstr "NextOID последней конт. точки:        %u\n"
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:763
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId послед. конт. точки:  %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId послед. конт. точки:  %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:765
@@ -353,8 +353,8 @@ msgstr "NextMultiOffset послед. конт. точки:  %u\n"
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:767
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "oldestXID последней конт. точки:      %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "oldestXID последней конт. точки:      %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:769
@@ -365,14 +365,14 @@ msgstr "БД с oldestXID последней конт. точки: %u\n"
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:771
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID последней к. т.:      %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID последней к. т.:      %llu\n"
 
 # skip-rule: capital-letter-first
 #: pg_resetwal.c:773
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid последней конт. точки: %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid последней конт. точки: %llu\n"
 
 # skip-rule: capital-letter-first, double-space
 #: pg_resetwal.c:775
@@ -383,14 +383,14 @@ msgstr "БД с oldestMulti последней к. т.:     %u\n"
 # skip-rule: capital-letter-first, double-space
 #: pg_resetwal.c:777
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid последней к. т.:    %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid последней к. т.:    %llu\n"
 
 # skip-rule: capital-letter-first, double-space
 #: pg_resetwal.c:779
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid последней к. т.:    %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid последней к. т.:    %llu\n"
 
 #: pg_resetwal.c:781
 #, c-format

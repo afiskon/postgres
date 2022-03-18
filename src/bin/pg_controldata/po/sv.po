@@ -304,8 +304,8 @@ msgstr "på"
 
 #: pg_controldata.c:252
 #, c-format
-msgid "Latest checkpoint's NextXID:          %u:%u\n"
-msgstr "NextXID vid senaste checkpoint:             %u:%u\n"
+msgid "Latest checkpoint's NextXID:          %u:%llu\n"
+msgstr "NextXID vid senaste checkpoint:             %u:%llu\n"
 
 #: pg_controldata.c:255
 #, c-format
@@ -314,8 +314,8 @@ msgstr "NextOID vid senaste checkpoint:             %u\n"
 
 #: pg_controldata.c:257
 #, c-format
-msgid "Latest checkpoint's NextMultiXactId:  %u\n"
-msgstr "NextMultiXactId vid senaste checkpoint:     %u\n"
+msgid "Latest checkpoint's NextMultiXactId:  %llu\n"
+msgstr "NextMultiXactId vid senaste checkpoint:     %llu\n"
 
 #: pg_controldata.c:259
 #, c-format
@@ -324,8 +324,8 @@ msgstr "NextMultiOffset vid senaste checkpoint:     %u\n"
 
 #: pg_controldata.c:261
 #, c-format
-msgid "Latest checkpoint's oldestXID:        %u\n"
-msgstr "oldestXID vid senaste checkpoint:           %u\n"
+msgid "Latest checkpoint's oldestXID:        %llu\n"
+msgstr "oldestXID vid senaste checkpoint:           %llu\n"
 
 #: pg_controldata.c:263
 #, c-format
@@ -334,13 +334,13 @@ msgstr "DB för oldestXID vid senaste checkpoint:    %u\n"
 
 #: pg_controldata.c:265
 #, c-format
-msgid "Latest checkpoint's oldestActiveXID:  %u\n"
-msgstr "oldestActiveXID vid senaste checkpoint:     %u\n"
+msgid "Latest checkpoint's oldestActiveXID:  %llu\n"
+msgstr "oldestActiveXID vid senaste checkpoint:     %llu\n"
 
 #: pg_controldata.c:267
 #, c-format
-msgid "Latest checkpoint's oldestMultiXid:   %u\n"
-msgstr "oldestMultiXid vid senaste checkpoint:      %u\n"
+msgid "Latest checkpoint's oldestMultiXid:   %llu\n"
+msgstr "oldestMultiXid vid senaste checkpoint:      %llu\n"
 
 #: pg_controldata.c:269
 #, c-format
@@ -349,13 +349,13 @@ msgstr "DB för oldestMulti vid senaste checkpoint:  %u\n"
 
 #: pg_controldata.c:271
 #, c-format
-msgid "Latest checkpoint's oldestCommitTsXid:%u\n"
-msgstr "oldestCommitTsXid vid senaste checkpoint:   %u\n"
+msgid "Latest checkpoint's oldestCommitTsXid:%llu\n"
+msgstr "oldestCommitTsXid vid senaste checkpoint:   %llu\n"
 
 #: pg_controldata.c:273
 #, c-format
-msgid "Latest checkpoint's newestCommitTsXid:%u\n"
-msgstr "newestCommitTsXid vid senaste checkpoint:   %u\n"
+msgid "Latest checkpoint's newestCommitTsXid:%llu\n"
+msgstr "newestCommitTsXid vid senaste checkpoint:   %llu\n"
 
 #: pg_controldata.c:275
 #, c-format
