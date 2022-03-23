@@ -47,13 +47,6 @@
 /*
  * Defines for CLOG page sizes.  A page is the same BLCKSZ as is used
  * everywhere else in Postgres.
- *
- * Note: because TransactionIds are 32 bits and wrap around at 0xFFFFFFFF,
- * CLOG page numbering also wraps around at 0xFFFFFFFF/CLOG_XACTS_PER_PAGE,
- * and CLOG segment numbering at
- * 0xFFFFFFFF/CLOG_XACTS_PER_PAGE/SLRU_PAGES_PER_SEGMENT.  We need take no
- * explicit notice of that fact in this module, except when comparing segment
- * and page numbers in TruncateCLOG (see CLOGPagePrecedes).
  */
 
 /* We need two bits per xact, so four xacts fit in a byte */
@@ -62,7 +55,49 @@
 #define CLOG_XACTS_PER_PAGE (BLCKSZ * CLOG_XACTS_PER_BYTE)
 #define CLOG_XACT_BITMASK	((1 << CLOG_BITS_PER_XACT) - 1)
 
-#define TransactionIdToPage(xid)	((xid) / (TransactionId) CLOG_XACTS_PER_PAGE)
+static inline int64
+TransactionIdToPageInternal(TransactionId xid, bool lock)
+{
+	FullTransactionId	fxid,
+						nextXid;
+	uint32				epoch;
+
+	if (lock)
+		LWLockAcquire(XidGenLock, LW_SHARED);
+
+	/* make a local copy */
+	nextXid = ShmemVariableCache->nextXid;
+
+	if (lock)
+		LWLockRelease(XidGenLock);
+
+	epoch = EpochFromFullTransactionId(nextXid);
+	if (xid > XidFromFullTransactionId(nextXid))
+		--epoch;
+
+	fxid = FullTransactionIdFromEpochAndXid(epoch, xid);
+
+	return fxid.value / (uint64) CLOG_XACTS_PER_PAGE;
+}
+
+static inline int64
+TransactionIdToPageNoLock(TransactionId xid)
+{
+	return TransactionIdToPageInternal(xid, false);
+}
+
+static inline int64
+TransactionIdToPage(TransactionId xid)
+{
+	return TransactionIdToPageInternal(xid, true);
+}
+
+static inline int64
+FullTransactionIdToPage(FullTransactionId xid)
+{
+	return xid.value / (uint64) CLOG_XACTS_PER_PAGE;
+}
+
 #define TransactionIdToPgIndex(xid) ((xid) % (TransactionId) CLOG_XACTS_PER_PAGE)
 #define TransactionIdToByte(xid)	(TransactionIdToPgIndex(xid) / CLOG_XACTS_PER_BYTE)
 #define TransactionIdToBIndex(xid)	((xid) % (TransactionId) CLOG_XACTS_PER_BYTE)
@@ -753,8 +788,7 @@ ZeroCLOGPage(int64 pageno, bool writeXlog)
 void
 StartupCLOG(void)
 {
-	TransactionId xid = XidFromFullTransactionId(ShmemVariableCache->nextXid);
-	int64		pageno = TransactionIdToPage(xid);
+	int64		pageno = FullTransactionIdToPage(ShmemVariableCache->nextXid);
 
 	LWLockAcquire(XactSLRULock, LW_EXCLUSIVE);
 
@@ -772,7 +806,8 @@ StartupCLOG(void)
 void
 TrimCLOG(void)
 {
-	TransactionId xid = XidFromFullTransactionId(ShmemVariableCache->nextXid);
+	FullTransactionId fxid = ShmemVariableCache->nextXid;
+	TransactionId xid = XidFromFullTransactionId(fxid);
 	int64		pageno = TransactionIdToPage(xid);
 
 	LWLockAcquire(XactSLRULock, LW_EXCLUSIVE);
@@ -848,7 +883,7 @@ ExtendCLOG(TransactionId newestXact)
 		!TransactionIdEquals(newestXact, FirstNormalTransactionId))
 		return;
 
-	pageno = TransactionIdToPage(newestXact);
+	pageno = TransactionIdToPageNoLock(newestXact);
 
 	LWLockAcquire(XactSLRULock, LW_EXCLUSIVE);
 
@@ -943,7 +978,6 @@ CLOGPagePrecedes(int64 page1, int64 page2)
 	return (TransactionIdPrecedes(xid1, xid2) &&
 			TransactionIdPrecedes(xid1, xid2 + CLOG_XACTS_PER_PAGE - 1));
 }
-
 
 /*
  * Write a ZEROPAGE xlog record
