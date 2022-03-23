@@ -63,7 +63,7 @@ static SlruCtlData SubTransCtlData;
 #define SubTransCtl  (&SubTransCtlData)
 
 
-static int	ZeroSUBTRANSPage(int pageno);
+static int	ZeroSUBTRANSPage(int64 pageno);
 static bool SubTransPagePrecedes(int64 page1, int64 page2);
 
 
@@ -73,7 +73,7 @@ static bool SubTransPagePrecedes(int64 page1, int64 page2);
 void
 SubTransSetParent(TransactionId xid, TransactionId parent)
 {
-	int			pageno = TransactionIdToPage(xid);
+	int64		pageno = TransactionIdToPage(xid);
 	int			entryno = TransactionIdToEntry(xid);
 	int			slotno;
 	TransactionId *ptr;
@@ -108,7 +108,7 @@ SubTransSetParent(TransactionId xid, TransactionId parent)
 TransactionId
 SubTransGetParent(TransactionId xid)
 {
-	int			pageno = TransactionIdToPage(xid);
+	int64		pageno = TransactionIdToPage(xid);
 	int			entryno = TransactionIdToEntry(xid);
 	int			slotno;
 	TransactionId *ptr;
@@ -234,7 +234,7 @@ BootStrapSUBTRANS(void)
  * Control lock must be held at entry, and will be held at exit.
  */
 static int
-ZeroSUBTRANSPage(int pageno)
+ZeroSUBTRANSPage(int64 pageno)
 {
 	return SimpleLruZeroPage(SubTransCtl, pageno);
 }
@@ -250,8 +250,8 @@ void
 StartupSUBTRANS(TransactionId oldestActiveXID)
 {
 	FullTransactionId nextXid;
-	int			startPage;
-	int			endPage;
+	int64		startPage;
+	int64		endPage;
 
 	/*
 	 * Since we don't expect pg_subtrans to be valid across crashes, we
@@ -308,7 +308,7 @@ CheckPointSUBTRANS(void)
 void
 ExtendSUBTRANS(TransactionId newestXact)
 {
-	int			pageno;
+	int64		pageno;
 
 	/*
 	 * No work except at first XID of a page.  But beware: just after
@@ -338,7 +338,7 @@ ExtendSUBTRANS(TransactionId newestXact)
 void
 TruncateSUBTRANS(TransactionId oldestXact)
 {
-	int			cutoffPage;
+	int64		cutoffPage;
 
 	/*
 	 * The cutoff point is the start of the segment containing oldestXact. We

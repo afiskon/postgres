@@ -63,11 +63,7 @@
 static int inline
 SlruFileName(SlruCtl ctl, char *path, int64 segno)
 {
-	/*
-	 * Since we do not have 64 bit XIDs yet, make sure have no overflow here.
-	 */
-	Assert(segno <= PG_INT32_MAX);
-	return snprintf(path, MAXPGPATH, "%s/%04X", ctl->Dir, (int) segno);
+	return snprintf(path, MAXPGPATH, "%s/%012llX", ctl->Dir, (long long) segno);
 }
 
 /*
@@ -1584,7 +1580,7 @@ SlruScanDirectory(SlruCtl ctl, SlruScanCallback callback, void *data)
 
 		len = strlen(clde->d_name);
 
-		if ((len == 4 || len == 5 || len == 6) &&
+		if ((len == 12 || len == 13 || len == 14) &&
 			strspn(clde->d_name, "0123456789ABCDEF") == len)
 		{
 			segno = (int) strtol(clde->d_name, NULL, 16);
