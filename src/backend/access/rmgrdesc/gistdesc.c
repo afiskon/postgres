@@ -26,11 +26,10 @@ out_gistxlogPageUpdate(StringInfo buf, gistxlogPageUpdate *xlrec)
 static void
 out_gistxlogPageReuse(StringInfo buf, gistxlogPageReuse *xlrec)
 {
-	appendStringInfo(buf, "rel %u/%u/%u; blk %u; snapshotConflictHorizon %u:%llu",
+	appendStringInfo(buf, "rel %u/%u/%u; blk %u; snapshotConflictHorizon %llu",
 					 xlrec->locator.spcOid, xlrec->locator.dbOid,
 					 xlrec->locator.relNumber, xlrec->block,
-					 EpochFromFullTransactionId(xlrec->snapshotConflictHorizon),
-					 (unsigned long long) XidFromFullTransactionId(xlrec->snapshotConflictHorizon));
+					 (unsigned long long) U64FromFullTransactionId(xlrec->snapshotConflictHorizon));
 }
 
 static void
@@ -51,9 +50,8 @@ out_gistxlogPageSplit(StringInfo buf, gistxlogPageSplit *xlrec)
 static void
 out_gistxlogPageDelete(StringInfo buf, gistxlogPageDelete *xlrec)
 {
-	appendStringInfo(buf, "deleteXid %u:%llu; downlink %u",
-					 EpochFromFullTransactionId(xlrec->deleteXid),
-					 (unsigned long long) XidFromFullTransactionId(xlrec->deleteXid),
+	appendStringInfo(buf, "deleteXid %llu; downlink %u",
+					 (unsigned long long) U64FromFullTransactionId(xlrec->deleteXid),
 					 xlrec->downlinkOffset);
 }
 
