@@ -4441,6 +4441,18 @@ _copyCompositeTypeStmt(const CompositeTypeStmt *from)
 	return newnode;
 }
 
+static CreateDictionaryStmt *
+_copyCreateDictionaryStmt(const CreateDictionaryStmt *from)
+{
+	CreateDictionaryStmt *newnode = makeNode(CreateDictionaryStmt);
+
+	COPY_NODE_FIELD(typeName);
+	COPY_NODE_FIELD(baseTypeName);
+	COPY_NODE_FIELD(vals);
+
+	return newnode;
+}
+
 static CreateEnumStmt *
 _copyCreateEnumStmt(const CreateEnumStmt *from)
 {
@@ -6181,6 +6193,9 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CompositeTypeStmt:
 			retval = _copyCompositeTypeStmt(from);
+			break;
+		case T_CreateDictionaryStmt:
+			retval = _copyCreateDictionaryStmt(from);
 			break;
 		case T_CreateEnumStmt:
 			retval = _copyCreateEnumStmt(from);

@@ -409,6 +409,7 @@ typedef enum NodeTag
 	T_DropOwnedStmt,
 	T_ReassignOwnedStmt,
 	T_CompositeTypeStmt,
+	T_CreateDictionaryStmt,
 	T_CreateEnumStmt,
 	T_CreateRangeStmt,
 	T_AlterEnumStmt,

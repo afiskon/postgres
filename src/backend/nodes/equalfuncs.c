@@ -1965,6 +1965,16 @@ _equalCompositeTypeStmt(const CompositeTypeStmt *a, const CompositeTypeStmt *b)
 }
 
 static bool
+_equalCreateDictionaryStmt(const CreateDictionaryStmt *a, const CreateDictionaryStmt *b)
+{
+	COMPARE_NODE_FIELD(typeName);
+	COMPARE_NODE_FIELD(baseTypeName);
+	COMPARE_NODE_FIELD(vals);
+
+	return true;
+}
+
+static bool
 _equalCreateEnumStmt(const CreateEnumStmt *a, const CreateEnumStmt *b)
 {
 	COMPARE_NODE_FIELD(typeName);
@@ -3984,6 +3994,9 @@ equal(const void *a, const void *b)
 			break;
 		case T_CompositeTypeStmt:
 			retval = _equalCompositeTypeStmt(a, b);
+			break;
+		case T_CreateDictionaryStmt:
+			retval = _equalCreateDictionaryStmt(a, b);
 			break;
 		case T_CreateEnumStmt:
 			retval = _equalCreateEnumStmt(a, b);

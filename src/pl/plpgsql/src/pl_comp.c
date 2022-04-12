@@ -2129,6 +2129,7 @@ build_datatype(HeapTuple typeTup, int32 typmod,
 	switch (typeStruct->typtype)
 	{
 		case TYPTYPE_BASE:
+		case TYPTYPE_DICT:
 		case TYPTYPE_ENUM:
 		case TYPTYPE_RANGE:
 		case TYPTYPE_MULTIRANGE:

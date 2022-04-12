@@ -1380,6 +1380,9 @@ nodetag_to_string(NodeTag tag)
 		case T_CompositeTypeStmt:
 			return "CompositeTypeStmt";
 			break;
+		case T_CreateDictionaryStmt:
+			return "CreateDictionaryStmt";
+			break;
 		case T_CreateEnumStmt:
 			return "CreateEnumStmt";
 			break;
