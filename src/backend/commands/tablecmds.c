@@ -593,7 +593,7 @@ static void ATExecReplicaIdentity(Relation rel, ReplicaIdentityStmt *stmt, LOCKM
 static void ATExecGenericOptions(Relation rel, List *options);
 static void ATExecSetRowSecurity(Relation rel, bool rls);
 static void ATExecForceNoForceRowSecurity(Relation rel, bool force_rls);
-static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
+static ObjectAddress ATExecSetCompression(Relation rel,
 										  const char *column, Node *newValue, LOCKMODE lockmode);
 
 static void index_copy_data(Relation rel, RelFileNode newrnode);
@@ -633,6 +633,7 @@ static void refuseDupeIndexAttach(Relation parentIdx, Relation partIdx,
 static List *GetParentedForeignKeyRefs(Relation partition);
 static void ATDetachCheckNoForeignKeyRefs(Relation partition);
 static char GetAttributeCompression(Oid atttypid, char *compression);
+static char	GetAttributeStorage(const char *storagemode);
 
 
 /* ----------------------------------------------------------------
@@ -931,6 +932,22 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		if (colDef->compression)
 			attr->attcompression = GetAttributeCompression(attr->atttypid,
 														   colDef->compression);
+
+		if (colDef->storage_name)
+		{
+			attr->attstorage = GetAttributeStorage(colDef->storage_name);
+			/*
+			 * safety check: do not allow toasted storage modes unless column datatype
+			 * is TOAST-aware.
+			 */
+			if (!(attr->attstorage == TYPSTORAGE_PLAIN ||
+				  TypeIsToastable(attr->atttypid)))
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("column data type %s can only have storage PLAIN",
+								format_type_be(attr->atttypid))));
+		}
+
 	}
 
 	/*
@@ -4963,8 +4980,8 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			address = ATExecSetStorage(rel, cmd->name, cmd->def, lockmode);
 			break;
-		case AT_SetCompression:
-			address = ATExecSetCompression(tab, rel, cmd->name, cmd->def,
+		case AT_SetCompression: /* ALTER COLUMN SET COMPRESSION */
+			address = ATExecSetCompression(rel, cmd->name, cmd->def,
 										   lockmode);
 			break;
 		case AT_DropColumn:		/* DROP COLUMN */
@@ -6819,7 +6836,23 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	attribute.atttypmod = typmod;
 	attribute.attbyval = tform->typbyval;
 	attribute.attalign = tform->typalign;
-	attribute.attstorage = tform->typstorage;
+	if (colDef->storage_name)
+	{
+		attribute.attstorage = GetAttributeStorage(colDef->storage_name);
+		/*
+		 * safety check: do not allow toasted storage modes unless column datatype
+		 * is TOAST-aware.
+		 */
+		if (!(attribute.attstorage == TYPSTORAGE_PLAIN ||
+			  TypeIsToastable(attribute.atttypid)))
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("column data type %s can only have storage PLAIN",
+							format_type_be(attribute.atttypid))));
+	}
+	else
+		attribute.attstorage = tform->typstorage;
+
 	attribute.attcompression = GetAttributeCompression(typeOid,
 													   colDef->compression);
 	attribute.attnotnull = colDef->is_not_null;
@@ -8262,7 +8295,6 @@ SetIndexStorageProperties(Relation rel, Relation attrelation,
 static ObjectAddress
 ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE lockmode)
 {
-	char	   *storagemode;
 	char		newstorage;
 	Relation	attrelation;
 	HeapTuple	tuple;
@@ -8271,24 +8303,8 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE loc
 	ObjectAddress address;
 
 	Assert(IsA(newValue, String));
-	storagemode = strVal(newValue);
 
-	if (pg_strcasecmp(storagemode, "plain") == 0)
-		newstorage = TYPSTORAGE_PLAIN;
-	else if (pg_strcasecmp(storagemode, "external") == 0)
-		newstorage = TYPSTORAGE_EXTERNAL;
-	else if (pg_strcasecmp(storagemode, "extended") == 0)
-		newstorage = TYPSTORAGE_EXTENDED;
-	else if (pg_strcasecmp(storagemode, "main") == 0)
-		newstorage = TYPSTORAGE_MAIN;
-	else
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid storage type \"%s\"",
-						storagemode)));
-		newstorage = 0;			/* keep compiler quiet */
-	}
+	newstorage = GetAttributeStorage(strVal(newValue));
 
 	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
 
@@ -16156,8 +16172,7 @@ ATExecGenericOptions(Relation rel, List *options)
  * Return value is the address of the modified column
  */
 static ObjectAddress
-ATExecSetCompression(AlteredTableInfo *tab,
-					 Relation rel,
+ATExecSetCompression(Relation rel,
 					 const char *column,
 					 Node *newValue,
 					 LOCKMODE lockmode)
@@ -19287,4 +19302,25 @@ GetAttributeCompression(Oid atttypid, char *compression)
 				 errmsg("invalid compression method \"%s\"", compression)));
 
 	return cmethod;
+}
+
+static char
+GetAttributeStorage(const char *storagemode)
+{
+	if (pg_strcasecmp(storagemode, "plain") == 0)
+		return TYPSTORAGE_PLAIN;
+	else if (pg_strcasecmp(storagemode, "external") == 0)
+		return TYPSTORAGE_EXTERNAL;
+	else if (pg_strcasecmp(storagemode, "extended") == 0)
+		return TYPSTORAGE_EXTENDED;
+	else if (pg_strcasecmp(storagemode, "main") == 0)
+		return TYPSTORAGE_MAIN;
+	else
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("invalid storage type \"%s\"",
+						storagemode)));
+		return 0;			/* keep compiler quiet */
+	}
 }
