@@ -416,6 +416,8 @@ ProcessCopyOptions(ParseState *pstate,
 	{
 		DefElem    *defel = lfirst_node(DefElem, option);
 
+
+		// AALEKSEEV TODO FIXME here is the place to add more formats
 		if (strcmp(defel->defname, "format") == 0)
 		{
 			char	   *fmt = defGetString(defel);

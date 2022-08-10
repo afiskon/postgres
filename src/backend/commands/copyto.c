@@ -86,7 +86,7 @@ typedef struct CopyToStateData
 	char	   *filename;		/* filename, or NULL for STDOUT */
 	bool		is_program;		/* is 'filename' a program to popen? */
 
-	CopyFormatOptions opts;
+	CopyFormatOptions opts;		// AALEKSEEV TODO FIXME: replace this with callbacks + void* argument
 	Node	   *whereClause;	/* WHERE condition (or NULL) */
 
 	/*

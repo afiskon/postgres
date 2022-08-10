@@ -72,7 +72,7 @@ typedef struct CopyFromStateData
 	bool		is_program;		/* is 'filename' a program to popen? */
 	copy_data_source_cb data_source_cb; /* function for reading data */
 
-	CopyFormatOptions opts;
+	CopyFormatOptions opts;		// AALEKSEEV TODO FIXME: replace this with callbacks + void* argument
 	bool	   *convert_select_flags;	/* per-column CSV/TEXT CS flags */
 	Node	   *whereClause;	/* WHERE condition (or NULL) */
 

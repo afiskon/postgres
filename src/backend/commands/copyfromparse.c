@@ -774,7 +774,7 @@ NextCopyFromRawFields(CopyFromState cstate, char ***fields, int *nfields)
 		{
 			int			fldnum;
 
-			if (cstate->opts.csv_mode)
+			if (cstate->opts.csv_mode) // AALESKEEV TODO FIXME !!!
 				fldct = CopyReadAttributesCSV(cstate);
 			else
 				fldct = CopyReadAttributesText(cstate);
@@ -912,7 +912,7 @@ NextCopyFrom(CopyFromState cstate, ExprContext *econtext,
 				continue;
 			}
 
-			if (cstate->opts.csv_mode)
+			if (cstate->opts.csv_mode) // AALEKSEEV TODO FIXME
 			{
 				if (string == NULL &&
 					cstate->opts.force_notnull_flags[m])
@@ -1126,7 +1126,7 @@ CopyReadLineText(CopyFromState cstate)
 	char		quotec = '\0';
 	char		escapec = '\0';
 
-	if (cstate->opts.csv_mode)
+	if (cstate->opts.csv_mode) // AALEKSEEV TODO FIXME
 	{
 		quotec = cstate->opts.quote[0];
 		escapec = cstate->opts.escape[0];
@@ -1206,7 +1206,7 @@ CopyReadLineText(CopyFromState cstate)
 		prev_raw_ptr = input_buf_ptr;
 		c = copy_input_buf[input_buf_ptr++];
 
-		if (cstate->opts.csv_mode)
+		if (cstate->opts.csv_mode) // AALEKSEEV TODO FIXME
 		{
 			/*
 			 * If character is '\\' or '\r', we may need to look ahead below.
@@ -1245,7 +1245,7 @@ CopyReadLineText(CopyFromState cstate)
 		}
 
 		/* Process \r */
-		if (c == '\r' && (!cstate->opts.csv_mode || !in_quote))
+		if (c == '\r' && (!cstate->opts.csv_mode || !in_quote)) // AALEKSEEV TODO FIXME
 		{
 			/* Check for \r\n on first line, _and_ handle \r\n. */
 			if (cstate->eol_type == EOL_UNKNOWN ||
@@ -1321,7 +1321,7 @@ CopyReadLineText(CopyFromState cstate)
 		 * In CSV mode, we only recognize \. alone on a line.  This is because
 		 * \. is a valid CSV data value.
 		 */
-		if (c == '\\' && (!cstate->opts.csv_mode || first_char_in_line))
+		if (c == '\\' && (!cstate->opts.csv_mode || first_char_in_line)) // AALEKSEEV TODO FIXME
 		{
 			char		c2;
 
@@ -1354,7 +1354,7 @@ CopyReadLineText(CopyFromState cstate)
 
 					if (c2 == '\n')
 					{
-						if (!cstate->opts.csv_mode)
+						if (!cstate->opts.csv_mode) // AALEKSEEV TODO FIXME
 							ereport(ERROR,
 									(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
 									 errmsg("end-of-copy marker does not match previous newline style")));
@@ -1363,7 +1363,7 @@ CopyReadLineText(CopyFromState cstate)
 					}
 					else if (c2 != '\r')
 					{
-						if (!cstate->opts.csv_mode)
+						if (!cstate->opts.csv_mode) // AALESKEEV TODO FIXME
 							ereport(ERROR,
 									(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
 									 errmsg("end-of-copy marker corrupt")));
@@ -1379,7 +1379,7 @@ CopyReadLineText(CopyFromState cstate)
 
 				if (c2 != '\r' && c2 != '\n')
 				{
-					if (!cstate->opts.csv_mode)
+					if (!cstate->opts.csv_mode) // AALESKEEV TODO FIXME
 						ereport(ERROR,
 								(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
 								 errmsg("end-of-copy marker corrupt")));
@@ -1408,7 +1408,7 @@ CopyReadLineText(CopyFromState cstate)
 				result = true;	/* report EOF */
 				break;
 			}
-			else if (!cstate->opts.csv_mode)
+			else if (!cstate->opts.csv_mode) // AALESKEEV TODO FIXME
 			{
 				/*
 				 * If we are here, it means we found a backslash followed by
@@ -1703,7 +1703,7 @@ CopyReadAttributesText(CopyFromState cstate)
  * "standard" (i.e. common) CSV usage.
  */
 static int
-CopyReadAttributesCSV(CopyFromState cstate)
+CopyReadAttributesCSV(CopyFromState cstate) // AALESKEEV TODO FIXME
 {
 	char		delimc = cstate->opts.delim[0];
 	char		quotec = cstate->opts.quote[0];
@@ -1874,7 +1874,7 @@ endfield:
 static Datum
 CopyReadBinaryAttribute(CopyFromState cstate, FmgrInfo *flinfo,
 						Oid typioparam, int32 typmod,
-						bool *isnull)
+						bool *isnull) // AALESKEEV TODO FIXME
 {
 	int32		fld_size;
 	Datum		result;
