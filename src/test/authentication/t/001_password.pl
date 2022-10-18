@@ -243,21 +243,21 @@ $node->connect_ok("user=scram_role require_auth=password,scram-sha-256,md5",
 # ...fail for other auth types...
 $node->connect_fails("user=scram_role require_auth=password",
 	"password authentication can be required: fails with SCRAM auth",
-	expected_stderr => qr/server requested SASL authentication/);
+	expected_stderr => qr/server requested unacceptable SASL mechanism "SCRAM-SHA-256"/);
 $node->connect_fails("user=scram_role require_auth=md5",
 	"md5 authentication can be required: fails with SCRAM auth",
-	expected_stderr => qr/server requested SASL authentication/);
+	expected_stderr => qr/server requested unacceptable SASL mechanism "SCRAM-SHA-256"/);
 $node->connect_fails("user=scram_role require_auth=none",
 	"all authentication can be forbidden: fails with SCRAM auth",
-	expected_stderr => qr/server requested SASL authentication/);
+	expected_stderr => qr/server requested unacceptable SASL mechanism "SCRAM-SHA-256"/);
 
 # ...and allow SCRAM authentication to be prohibited.
 $node->connect_fails("user=scram_role require_auth=!scram-sha-256",
 	"SCRAM authentication can be forbidden: fails with SCRAM auth",
-	expected_stderr => qr/server requested SASL authentication/);
+	expected_stderr => qr/server requested unacceptable SASL mechanism "SCRAM-SHA-256"/);
 $node->connect_fails("user=scram_role require_auth=!password,!md5,!scram-sha-256",
 	"multiple authentication types can be forbidden: fails with SCRAM auth",
-	expected_stderr => qr/server requested SASL authentication/);
+	expected_stderr => qr/server requested unacceptable SASL mechanism "SCRAM-SHA-256"/);
 
 # Test that bad passwords are rejected.
 $ENV{"PGPASSWORD"} = 'badpass';

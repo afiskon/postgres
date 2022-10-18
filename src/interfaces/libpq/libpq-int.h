@@ -461,6 +461,8 @@ struct pg_conn
 
 	bool		auth_required;	/* require an authentication challenge from the server? */
 	uint32		allowed_auth_methods;	/* bitmask of acceptable AuthRequest codes */
+	const char **sasl_mechs;	/* list of allowed/denied SASL mechanisms */
+	bool		sasl_mechs_denied;	/* is the sasl_mechs list forbidden? */
 
 	/* Transient state needed while establishing connection */
 	PGTargetServerType target_server_type;	/* desired session properties */

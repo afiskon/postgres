@@ -536,6 +536,41 @@ pg_SASL_init(PGconn *conn, int payloadlen)
 		goto error;
 	}
 
+	/*
+	 * Before going ahead with any SASL exchange, ensure that the user has
+	 * allowed (or, alternatively, has not forbidden) this particular mechanism.
+	 *
+	 * In a hypothetical future where a server responds with multiple SASL
+	 * mechanism families, we would need to instead consult this list up above,
+	 * during mechanism negotiation. We don't live in that world yet. The server
+	 * presents one auth method and we decide whether that's acceptable or not.
+	 */
+	if (conn->sasl_mechs)
+	{
+		const char **mech;
+		bool		found = false;
+
+		Assert(conn->require_auth);
+
+		for (mech = conn->sasl_mechs; *mech; mech++)
+		{
+			if (strcmp(*mech, selected_mechanism) == 0)
+			{
+				found = true;
+				break;
+			}
+		}
+
+		if ((conn->sasl_mechs_denied && found)
+			|| (!conn->sasl_mechs_denied && !found))
+		{
+			appendPQExpBuffer(&conn->errorMessage,
+							  libpq_gettext("auth method \"%s\" requirement failed: server requested unacceptable SASL mechanism \"%s\"\n"),
+							  conn->require_auth, selected_mechanism);
+			goto error;
+		}
+	}
+
 	if (conn->channel_binding[0] == 'r' &&	/* require */
 		strcmp(selected_mechanism, SCRAM_SHA_256_PLUS_NAME) != 0)
 	{

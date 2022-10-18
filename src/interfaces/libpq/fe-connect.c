@@ -1259,11 +1259,25 @@ connectOptions2(PGconn *conn)
 		bool		first, more;
 		bool		negated = false;
 
+		static const uint32 default_methods = (
+			1 << AUTH_REQ_SASL
+			| 1 << AUTH_REQ_SASL_CONT
+			| 1 << AUTH_REQ_SASL_FIN
+		);
+		static const char *no_mechs[] = { NULL };
+
 		/*
-		 * By default, start from an empty set of allowed options and add to it.
+		 * By default, start from a minimum set of allowed options and add to
+		 * it.
+		 *
+		 * NB: The SASL method codes are always "allowed" here. If the server
+		 * requests SASL auth, pg_SASL_init() will enforce adherence to the
+		 * sasl_mechs list, which by default is empty.
 		 */
 		conn->auth_required = true;
-		conn->allowed_auth_methods = 0;
+		conn->allowed_auth_methods = default_methods;
+		conn->sasl_mechs = no_mechs;
+		conn->sasl_mechs_denied = false;
 
 		for (first = true, more = true; more; first = false)
 		{
@@ -1289,6 +1303,9 @@ connectOptions2(PGconn *conn)
 					 */
 					conn->auth_required = false;
 					conn->allowed_auth_methods = -1;
+
+					/* conn->sasl_mechs is now a list of denied mechanisms. */
+					conn->sasl_mechs_denied = true;
 				}
 				else if (!negated)
 				{
@@ -1335,10 +1352,23 @@ connectOptions2(PGconn *conn)
 			}
 			else if (strcmp(method, "scram-sha-256") == 0)
 			{
-				/* This currently assumes that SCRAM is the only SASL method. */
-				bits = (1 << AUTH_REQ_SASL);
-				bits |= (1 << AUTH_REQ_SASL_CONT);
-				bits |= (1 << AUTH_REQ_SASL_FIN);
+				static const char *scram_mechs[] = {
+					SCRAM_SHA_256_NAME,
+					SCRAM_SHA_256_PLUS_NAME,
+					NULL /* list terminator */
+				};
+
+				/*
+				 * This currently assumes that SCRAM is the only SASL method.
+				 * Once a second mechanism is added, this code will need to add
+				 * to the list instead of replacing it wholesale.
+				 */
+				if (conn->sasl_mechs[0])
+					goto duplicate;
+				conn->sasl_mechs = scram_mechs;
+
+				free(part);
+				continue; /* avoid the bitmask manipulation below */
 			}
 			else if (strcmp(method, "none") == 0)
 			{
