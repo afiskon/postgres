@@ -54,7 +54,7 @@
 #include "utils/memdebug.h"
 #include "utils/ps_status.h"
 #include "utils/rel.h"
-#include "utils/resowner_private.h"
+#include "utils/resowner.h"
 #include "utils/timestamp.h"
 
 
@@ -207,6 +207,18 @@ static PrivateRefCountEntry *NewPrivateRefCountEntry(Buffer buffer);
 static PrivateRefCountEntry *GetPrivateRefCountEntry(Buffer buffer, bool do_move);
 static inline int32 GetPrivateRefCount(Buffer buffer);
 static void ForgetPrivateRefCountEntry(PrivateRefCountEntry *ref);
+
+/* ResourceOwner callbacks to hold buffer pins */
+static void ResOwnerReleaseBuffer(Datum res);
+static void ResOwnerPrintBufferLeakWarning(Datum res);
+
+ResourceOwnerFuncs buffer_resowner_funcs =
+{
+	.name = "buffer",
+	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.ReleaseResource = ResOwnerReleaseBuffer,
+	.PrintLeakWarning = ResOwnerPrintBufferLeakWarning
+};
 
 /*
  * Ensure that the PrivateRefCountArray has sufficient space to store one more
@@ -622,7 +634,7 @@ ReadRecentBuffer(RelFileLocator rlocator, ForkNumber forkNum, BlockNumber blockN
 
 	Assert(BufferIsValid(recent_buffer));
 
-	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+	ResourceOwnerEnlarge(CurrentResourceOwner);
 	ReservePrivateRefCountEntry();
 	InitBufferTag(&tag, &rlocator, forkNum, blockNum);
 
@@ -1219,7 +1231,7 @@ BufferAlloc(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 		 * pin.
 		 */
 		ReservePrivateRefCountEntry();
-		ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+		ResourceOwnerEnlarge(CurrentResourceOwner);
 
 		/*
 		 * Select a victim buffer.  The buffer is returned with its header
@@ -1752,7 +1764,7 @@ PinBuffer(BufferDesc *buf, BufferAccessStrategy strategy)
 	bool		result;
 	PrivateRefCountEntry *ref;
 
-	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+	ResourceOwnerEnlarge(CurrentResourceOwner);
 
 	ref = GetPrivateRefCountEntry(b, true);
 
@@ -1835,7 +1847,7 @@ PinBuffer(BufferDesc *buf, BufferAccessStrategy strategy)
  *
  * As this function is called with the spinlock held, the caller has to
  * previously call ReservePrivateRefCountEntry() and
- * ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+ * ResourceOwnerEnlarge(CurrentResourceOwner);
  *
  * Currently, no callers of this function want to modify the buffer's
  * usage_count at all, so there's no need for a strategy parameter.
@@ -2573,7 +2585,7 @@ SyncOneBuffer(int buf_id, bool skip_recently_used, WritebackContext *wb_context)
 
 	/* Make sure we can handle the pin */
 	ReservePrivateRefCountEntry();
-	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+	ResourceOwnerEnlarge(CurrentResourceOwner);
 
 	/*
 	 * Check whether buffer needs writing.
@@ -3634,7 +3646,7 @@ FlushRelationBuffers(Relation rel)
 
 		/* Make sure we can handle the pin */
 		ReservePrivateRefCountEntry();
-		ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+		ResourceOwnerEnlarge(CurrentResourceOwner);
 
 		buf_state = LockBufHdr(bufHdr);
 		if (BufTagMatchesRelFileLocator(&bufHdr->tag, &rel->rd_locator) &&
@@ -3731,7 +3743,7 @@ FlushRelationsAllBuffers(SMgrRelation *smgrs, int nrels)
 
 		/* Make sure we can handle the pin */
 		ReservePrivateRefCountEntry();
-		ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+		ResourceOwnerEnlarge(CurrentResourceOwner);
 
 		buf_state = LockBufHdr(bufHdr);
 		if (BufTagMatchesRelFileLocator(&bufHdr->tag, &srelent->rlocator) &&
@@ -3941,7 +3953,7 @@ FlushDatabaseBuffers(Oid dbid)
 
 		/* Make sure we can handle the pin */
 		ReservePrivateRefCountEntry();
-		ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+		ResourceOwnerEnlarge(CurrentResourceOwner);
 
 		buf_state = LockBufHdr(bufHdr);
 		if (bufHdr->tag.dbOid == dbid &&
@@ -4024,7 +4036,7 @@ void
 IncrBufferRefCount(Buffer buffer)
 {
 	Assert(BufferIsPinned(buffer));
-	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
+	ResourceOwnerEnlarge(CurrentResourceOwner);
 	if (BufferIsLocal(buffer))
 		LocalRefCount[-buffer - 1]++;
 	else
@@ -5077,4 +5089,19 @@ TestForOldSnapshot_impl(Snapshot snapshot, Relation relation)
 		ereport(ERROR,
 				(errcode(ERRCODE_SNAPSHOT_TOO_OLD),
 				 errmsg("snapshot too old")));
+}
+
+/*
+ * ResourceOwner callbacks
+ */
+static void
+ResOwnerReleaseBuffer(Datum res)
+{
+	ReleaseBuffer(DatumGetInt32(res));
+}
+
+static void
+ResOwnerPrintBufferLeakWarning(Datum res)
+{
+	PrintBufferLeakWarning(DatumGetInt32(res));
 }
