@@ -1602,8 +1602,6 @@ SearchCatCacheList(CatCache *cache,
 	 * block to ensure we can undo those refcounts if we get an error before
 	 * we finish constructing the CatCList.
 	 */
-	ResourceOwnerEnlargeCatCacheListRefs(CurrentResourceOwner);
-
 	ctlist = NIL;
 
 	PG_TRY();
@@ -1691,13 +1689,22 @@ SearchCatCacheList(CatCache *cache,
 
 		table_close(relation, AccessShareLock);
 
+		/* Make sure the resource owner has room to remember this entry. */
+		ResourceOwnerEnlargeCatCacheListRefs(CurrentResourceOwner);
+
 		/* Now we can build the CatCList entry. */
 		oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
 		nmembers = list_length(ctlist);
 		cl = (CatCList *)
 			palloc(offsetof(CatCList, members) + nmembers * sizeof(CatCTup *));
 
-		/* Extract key values */
+		/*
+		 * Extract key values.
+		 *
+		 * XXX: If we run out of memory while copying the key values, we will
+		 * leak any allocations we had already made in the CacheMemoryContext.
+		 * That is unlikely enough that we just accept the risk.
+		 */
 		CatCacheCopyKeys(cache->cc_tupdesc, nkeys, cache->cc_keyno,
 						 arguments, cl->keys);
 		MemoryContextSwitchTo(oldcxt);
