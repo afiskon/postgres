@@ -1602,8 +1602,6 @@ SearchCatCacheList(CatCache *cache,
 	 * block to ensure we can undo those refcounts if we get an error before
 	 * we finish constructing the CatCList.
 	 */
-	ResourceOwnerEnlargeCatCacheListRefs(CurrentResourceOwner);
-
 	ctlist = NIL;
 
 	PG_TRY();
@@ -1690,6 +1688,9 @@ SearchCatCacheList(CatCache *cache,
 		systable_endscan(scandesc);
 
 		table_close(relation, AccessShareLock);
+
+		/* Make sure the resource owner has room to remember this entry. */
+		ResourceOwnerEnlargeCatCacheListRefs(CurrentResourceOwner);
 
 		/* Now we can build the CatCList entry. */
 		oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
