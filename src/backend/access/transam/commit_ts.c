@@ -852,7 +852,7 @@ ExtendCommitTs(TransactionId newestXact)
 void
 TruncateCommitTs(TransactionId oldestXact)
 {
-	int			cutoffPage;
+	int64		cutoffPage;
 
 	/*
 	 * The cutoff point is the start of the segment containing oldestXact. We
@@ -866,10 +866,10 @@ TruncateCommitTs(TransactionId oldestXact)
 		return;					/* nothing to remove */
 
 	/* Write XLOG record */
-	WriteTruncateXlogRec(cutoffPage, oldestXact);
+	WriteTruncateXlogRec((int)cutoffPage, oldestXact);
 
 	/* Now we can remove the old CommitTs segment(s) */
-	SimpleLruTruncate(CommitTsCtl, cutoffPage);
+	SimpleLruTruncate(CommitTsCtl, (int)cutoffPage);
 }
 
 /*
