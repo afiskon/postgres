@@ -36,6 +36,19 @@ bool		have_slrustats = false;
 
 
 /*
+ * Calculate how much SLRU usage counters have increased and update
+ * shared statistics.
+ *
+ * Must be called by processes that interact with SLRU caches, that
+ * do not call pgstat_report_stat(), like checkpointer.
+ */
+void
+pgstat_report_slru(bool force)
+{
+	pgstat_slru_flush(force);
+}
+
+/*
  * Reset counters for a single SLRU.
  *
  * Permission checking for this function is managed through the normal

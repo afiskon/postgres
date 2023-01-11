@@ -505,6 +505,7 @@ CheckpointerMain(void)
 		/* Report pending statistics to the cumulative stats system */
 		pgstat_report_checkpointer();
 		pgstat_report_wal(true);
+		pgstat_report_slru(true);
 
 		/*
 		 * If any checkpoint flags have been set, redo the loop to handle the
