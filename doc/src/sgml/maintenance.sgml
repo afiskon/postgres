@@ -667,7 +667,7 @@ HINT:  To prevent entering read-only mode, execute a database-wide VACUUM in tha
 
 <programlisting>
 ERROR:  database is not accepting commands that generate new XIDs to avoid wraparound data loss in database "mydb"
-HINT:  Stop the postmaster and vacuum that database in single-user mode.
+HINT:  VACUUM or VACUUM FREEZE that database.
 </programlisting>
 
     In this condition the system can still execute read-only transactions.
@@ -676,11 +676,7 @@ HINT:  Stop the postmaster and vacuum that database in single-user mode.
 
     The three-million-transaction safety margin exists to let the
     administrator recover without data loss, by manually executing the
-    required <command>VACUUM</command> commands.  However
-    the only way to do this is to stop the server and start the server in single-user
-    mode to execute <command>VACUUM</command>. See the
-    <xref linkend="app-postgres"/> reference page for details about using
-    single-user mode.
+    required <command>VACUUM</command> commands.
    </para>
 
    <sect3 id="vacuum-for-multixact-wraparound">
