@@ -128,14 +128,14 @@ GetNewTransactionId(bool isSubXact)
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("database is not accepting commands that generate new XIDs to avoid wraparound data loss in database \"%s\"",
 								oldest_datname),
-						 errhint("Stop the postmaster and vacuum that database in single-user mode.\n"
+						 errhint("Execute a database-wide VACUUM in that database.\n"
 								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("database is not accepting commands that generate new XIDs to avoid wraparound data loss in database with OID %u",
 								oldest_datoid),
-						 errhint("Stop the postmaster and vacuum that database in single-user mode.\n"
+						 errhint("Execute a database-wide VACUUM in that database.\n"
 								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
 		}
 		else if (TransactionIdFollowsOrEquals(xid, xidWarnLimit))
