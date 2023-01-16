@@ -666,7 +666,7 @@ HINT:  To avoid a database shutdown, execute a database-wide VACUUM in that data
     once there are fewer than three million transactions left until wraparound:
 
 <programlisting>
-ERROR:  database is not accepting commands to avoid wraparound data loss in database "mydb"
+ERROR:  database is not accepting commands that generate new XIDs to avoid wraparound data loss in database "mydb"
 HINT:  Stop the postmaster and vacuum that database in single-user mode.
 </programlisting>
 
