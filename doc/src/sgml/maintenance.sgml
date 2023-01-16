@@ -655,7 +655,7 @@ SELECT datname, age(datfrozenxid) FROM pg_database;
 
 <programlisting>
 WARNING:  database "mydb" must be vacuumed within 39985967 transactions
-HINT:  To avoid a database shutdown, execute a database-wide VACUUM in that database.
+HINT:  To prevent entering read-only mode, execute a database-wide VACUUM in that database.
 </programlisting>
 
     (A manual <command>VACUUM</command> should fix the problem, as suggested by the
