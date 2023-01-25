@@ -1955,7 +1955,7 @@ ExecUpdatePrepareSlot(ResultRelInfo *resultRelInfo,
 static TM_Result
 ExecUpdateAct(ModifyTableContext *context, ResultRelInfo *resultRelInfo,
 			  ItemPointer tupleid, HeapTuple oldtuple, TupleTableSlot *slot,
-			  bool canSetTag, UpdateContext *updateCxt)
+			  bool canSetTag, UpdateContext *updateCxt, bool force_visibility)
 {
 	EState	   *estate = context->estate;
 	Relation	resultRelationDesc = resultRelInfo->ri_RelationDesc;
@@ -2089,7 +2089,7 @@ lreplace:
 								estate->es_crosscheck_snapshot,
 								true /* wait for commit */ ,
 								&context->tmfd, &updateCxt->lockmode,
-								&updateCxt->updateIndexes);
+								&updateCxt->updateIndexes, force_visibility);
 	if (result == TM_Ok)
 		updateCxt->updated = true;
 
@@ -2240,7 +2240,7 @@ ExecCrossPartitionUpdateForeignKey(ModifyTableContext *context,
 static TupleTableSlot *
 ExecUpdate(ModifyTableContext *context, ResultRelInfo *resultRelInfo,
 		   ItemPointer tupleid, HeapTuple oldtuple, TupleTableSlot *slot,
-		   bool canSetTag)
+		   bool canSetTag, bool force_visibility)
 {
 	EState	   *estate = context->estate;
 	Relation	resultRelationDesc = resultRelInfo->ri_RelationDesc;
@@ -2298,7 +2298,7 @@ ExecUpdate(ModifyTableContext *context, ResultRelInfo *resultRelInfo,
 
 redo_act:
 		result = ExecUpdateAct(context, resultRelInfo, tupleid, oldtuple, slot,
-							   canSetTag, &updateCxt);
+							   canSetTag, &updateCxt, force_visibility);
 
 		/*
 		 * If ExecUpdateAct reports that a cross-partition update was done,
@@ -2496,6 +2496,9 @@ ExecOnConflictUpdate(ModifyTableContext *context,
 	TransactionId xmin;
 	bool		isnull;
 
+	/* Is this a case of conflicting tuples created within the same command? */
+	bool		conflict_within_command = false;
+
 	/* Determine lock mode to use */
 	lockmode = ExecUpdateLockMode(context->estate, resultRelInfo);
 
@@ -2522,17 +2525,6 @@ ExecOnConflictUpdate(ModifyTableContext *context,
 			 * This can occur when a just inserted tuple is updated again in
 			 * the same command. E.g. because multiple rows with the same
 			 * conflicting key values are inserted.
-			 *
-			 * This is somewhat similar to the ExecUpdate() TM_SelfModified
-			 * case.  We do not want to proceed because it would lead to the
-			 * same row being updated a second time in some unspecified order,
-			 * and in contrast to plain UPDATEs there's no historical behavior
-			 * to break.
-			 *
-			 * It is the user's responsibility to prevent this situation from
-			 * occurring.  These problems are why the SQL standard similarly
-			 * specifies that for SQL MERGE, an exception must be raised in
-			 * the event of an attempt to update the same row twice.
 			 */
 			xminDatum = slot_getsysattr(existing,
 										MinTransactionIdAttributeNumber,
@@ -2541,12 +2533,14 @@ ExecOnConflictUpdate(ModifyTableContext *context,
 			xmin = DatumGetTransactionId(xminDatum);
 
 			if (TransactionIdIsCurrentTransactionId(xmin))
-				ereport(ERROR,
-						(errcode(ERRCODE_CARDINALITY_VIOLATION),
-				/* translator: %s is a SQL command name */
-						 errmsg("%s command cannot affect row a second time",
-								"ON CONFLICT DO UPDATE"),
-						 errhint("Ensure that no rows proposed for insertion within the same command have duplicate constrained values.")));
+			{
+				/*
+				 * Detect the case of ON CONFLICT .. DO UPDATE ..  with
+				 * conflicting tuples created within the same command.
+				 */
+				conflict_within_command = true;
+				break;
+			}
 
 			/* This shouldn't happen */
 			elog(ERROR, "attempted to lock invisible tuple");
@@ -2674,7 +2668,7 @@ ExecOnConflictUpdate(ModifyTableContext *context,
 	*returning = ExecUpdate(context, resultRelInfo,
 							conflictTid, NULL,
 							resultRelInfo->ri_onConflict->oc_ProjSlot,
-							canSetTag);
+							canSetTag, conflict_within_command);
 
 	/*
 	 * Clear out existing tuple, as there might not be another conflict among
@@ -2881,7 +2875,8 @@ lmerge_matched:
 				}
 				ExecUpdatePrepareSlot(resultRelInfo, newslot, context->estate);
 				result = ExecUpdateAct(context, resultRelInfo, tupleid, NULL,
-									   newslot, mtstate->canSetTag, &updateCxt);
+									   newslot, mtstate->canSetTag, &updateCxt,
+									   false);
 				if (result == TM_Ok && updateCxt.updated)
 				{
 					ExecUpdateEpilogue(context, &updateCxt, resultRelInfo,
@@ -3847,7 +3842,7 @@ ExecModifyTable(PlanState *pstate)
 
 				/* Now apply the update. */
 				slot = ExecUpdate(&context, resultRelInfo, tupleid, oldtuple,
-								  slot, node->canSetTag);
+								  slot, node->canSetTag, false);
 				break;
 
 			case CMD_DELETE:
