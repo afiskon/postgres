@@ -150,7 +150,8 @@ static void ResOwnerPrintDSMLeakWarning(Datum res);
 static ResourceOwnerFuncs dsm_resowner_funcs =
 {
 	.name = "dynamic shared memory segment",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_DSMS,
 	.ReleaseResource = ResOwnerReleaseDSM,
 	.PrintLeakWarning = ResOwnerPrintDSMLeakWarning
 };
@@ -1275,13 +1276,15 @@ is_main_region_dsm_handle(dsm_handle handle)
 	return handle & 1;
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseDSM(Datum res)
 {
-	dsm_detach((dsm_segment *) DatumGetPointer(res));
+	dsm_segment *seg = (dsm_segment *) res;
+
+	seg->resowner = NULL;
+	dsm_detach(seg);
 }
 static void
 ResOwnerPrintDSMLeakWarning(Datum res)

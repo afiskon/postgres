@@ -127,9 +127,9 @@ static void ResOwnerPrintJitContextLeakWarning(Datum res);
 
 static ResourceOwnerFuncs jit_resowner_funcs =
 {
-	/* relcache references */
 	.name = "LLVM JIT context",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_JIT_CONTEXTS,
 	.ReleaseResource = ResOwnerReleaseJitContext,
 	.PrintLeakWarning = ResOwnerPrintJitContextLeakWarning
 };
@@ -241,7 +241,8 @@ llvm_release_context(JitContext *context)
 	list_free(llvm_context->handles);
 	llvm_context->handles = NIL;
 
-	ResourceOwnerForgetJIT(context->resowner, context);
+	if (context->resowner)
+		ResourceOwnerForgetJIT(context->resowner, context);
 }
 
 /*
@@ -1294,7 +1295,10 @@ llvm_error_message(LLVMErrorRef error)
 static void
 ResOwnerReleaseJitContext(Datum res)
 {
-	jit_release_context((JitContext *) DatumGetPointer(res));
+	JitContext *context = (JitContext *) DatumGetPointer(res);
+
+	context->resowner = NULL;
+	jit_release_context(context);
 }
 
 static void

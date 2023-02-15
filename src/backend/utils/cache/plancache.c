@@ -119,11 +119,11 @@ static void PlanCacheSysCallback(Datum arg, int cacheid, uint32 hashvalue);
 static void ResOwnerReleaseCachedPlan(Datum res);
 static void ResOwnerPrintPlanCacheLeakWarning(Datum res);
 
-/* this is exported for ResourceOwnerReleaseAllPlanCacheRefs() */
-ResourceOwnerFuncs planref_resowner_funcs =
+static ResourceOwnerFuncs planref_resowner_funcs =
 {
 	.name = "plancache reference",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_PLANCACHE_REFS,
 	.ReleaseResource = ResOwnerReleaseCachedPlan,
 	.PrintLeakWarning = ResOwnerPrintPlanCacheLeakWarning
 };
@@ -2228,13 +2228,20 @@ ResetPlanCache(void)
 }
 
 /*
- * ResourceOwner callbacks
+ * Release all CachedPlans remembered by 'owner'
  */
+void
+ReleaseAllPlanCacheRefsInOwner(ResourceOwner owner)
+{
+	ResourceOwnerReleaseAllOfKind(owner, &planref_resowner_funcs);
+}
+
+/* ResourceOwner callbacks */
 
 static void
 ResOwnerReleaseCachedPlan(Datum res)
 {
-	ReleaseCachedPlan((CachedPlan *) DatumGetPointer(res), CurrentResourceOwner);
+	ReleaseCachedPlan((CachedPlan *) DatumGetPointer(res), NULL);
 }
 
 static void

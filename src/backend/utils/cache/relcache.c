@@ -274,6 +274,7 @@ static HTAB *OpClassCache = NULL;
 
 /* non-export function prototypes */
 
+static void RelationCloseCleanup(Relation relation);
 static void RelationDestroyRelation(Relation relation, bool remember_tupdesc);
 static void RelationClearRelation(Relation relation, bool rebuild);
 
@@ -2123,7 +2124,8 @@ static void ResOwnerPrintRelCacheLeakWarning(Datum res);
 static ResourceOwnerFuncs relref_resowner_funcs =
 {
 	.name = "relcache reference",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_RELCACHE_REFS,
 	.ReleaseResource = ResOwnerReleaseRelation,
 	.PrintLeakWarning = ResOwnerPrintRelCacheLeakWarning
 };
@@ -2181,6 +2183,12 @@ RelationClose(Relation relation)
 	/* Note: no locking manipulations needed */
 	RelationDecrementReferenceCount(relation);
 
+	RelationCloseCleanup(relation);
+}
+
+static void
+RelationCloseCleanup(Relation relation)
+{
 	/*
 	 * If the relation is no longer open in this session, we can clean up any
 	 * stale partition descriptors it has.  This is unlikely, so check to see
@@ -6839,7 +6847,7 @@ unlink_initfile(const char *initfilename, int elevel)
 static void
 ResOwnerPrintRelCacheLeakWarning(Datum res)
 {
-	Relation	rel = (Relation) res;
+	Relation	rel = (Relation) DatumGetPointer(res);
 
 	elog(WARNING, "relcache reference leak: relation \"%s\" not closed",
 		 RelationGetRelationName(rel));
@@ -6848,5 +6856,15 @@ ResOwnerPrintRelCacheLeakWarning(Datum res)
 static void
 ResOwnerReleaseRelation(Datum res)
 {
-	RelationClose((Relation) res);
+	Relation	rel = (Relation) DatumGetPointer(res);
+
+	/*
+	 * This reference has already been removed from ther resource owner, so
+	 * decrement reference count without calling
+	 * ResourceOwnerForgetRelationRef.
+	 */
+	Assert(rel->rd_refcnt > 0);
+	rel->rd_refcnt -= 1;
+
+	RelationCloseCleanup((Relation) res);
 }

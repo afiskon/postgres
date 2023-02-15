@@ -6,7 +6,31 @@
  * Query-lifespan resources are tracked by associating them with
  * ResourceOwner objects.  This provides a simple mechanism for ensuring
  * that such resources are freed at the right time.
- * See utils/resowner/README for more info.
+ * See utils/resowner/README for more info on how to use it.
+ *
+ * The implementation consists of a small fixed-size array and a hash table.
+ * New entries are inserted to the fixed-size array, and when the array fills
+ * up, all the entries are moved to the hash table.  This way, the array
+ * always contains a few most recently remembered references.  To find a
+ * particular reference, you need to search both the array and the hash table.
+ *
+ * The most frequent usage is that a resource is remembered, and forgotten
+ * shortly thereafter.  For example, pin a buffer, read one tuple from it,
+ * release the pin.  Linearly scanning the small array handles that case
+ * efficiently.  However, some resources are held for a longer time, and
+ * sometimes a lot of resources need to be held simultaneously.  The hash
+ * table handles those cases.
+ *
+ * When it's time to release the resources, we sort them according to the
+ * release-priority of each resource, and release them in that order.
+ *
+ * Local lock references are special, they are not stored in the array or the
+ * hash table.  Instead, each resource owner has a separate small cache of
+ * locks it owns.  The lock manager has the same information in its local lock
+ * hash table, and we fall back on that if cache overflows, but traversing the
+ * hash table is slower when there are a lot of locks belonging to other
+ * resource owners.  This is to speed up bulk releasing or reassigning locks
+ * from a resource owner to its parent.
  *
  *
  * Portions Copyright (c) 1996-2023, PostgreSQL Global Development Group
@@ -25,7 +49,6 @@
 #include "storage/predicate.h"
 #include "storage/proc.h"
 #include "utils/memutils.h"
-#include "utils/plancache.h"
 #include "utils/resowner.h"
 
 /*
@@ -41,33 +64,34 @@ typedef struct ResourceElem
 } ResourceElem;
 
 /*
- * Size of the small fixed-size array to hold most-recently remembered resources.
+ * Size of the fixed-size array to hold most-recently remembered resources.
  */
 #define RESOWNER_ARRAY_SIZE 32
 
 /*
- * Initially allocated size of a ResourceOwner's hash.  Must be power of two since
- * we'll use (capacity - 1) as mask for hashing.
+ * Initially allocated size of a ResourceOwner's hash table.  Must be power of
+ * two because we use (capacity - 1) as mask for hashing.
  */
 #define RESOWNER_HASH_INIT_SIZE 64
 
 /*
- * How many items may be stored in a hash of given capacity.
- * When this number is reached, we must resize.
+ * How many items may be stored in a hash table of given capacity.  When this
+ * number is reached, we must resize.
+ *
+ * The hash table must always have enough free space that we can copy the
+ * entries from the array to it, in ResouceOwnerSort.  We also insist that the
+ * initial size is large enough that we don't hit the max size immediately
+ * when it's created. Aside from those limitations, 0.75 is a reasonable fill
+ * factor.
  */
-#define RESOWNER_HASH_MAX_ITEMS(capacity) ((capacity)/4 * 3)
+#define RESOWNER_HASH_MAX_ITEMS(capacity) \
+	Min(capacity - RESOWNER_ARRAY_SIZE, (capacity)/4 * 3)
 
-StaticAssertDecl(RESOWNER_HASH_MAX_ITEMS(RESOWNER_HASH_INIT_SIZE) > RESOWNER_ARRAY_SIZE,
+StaticAssertDecl(RESOWNER_HASH_MAX_ITEMS(RESOWNER_HASH_INIT_SIZE) >= RESOWNER_ARRAY_SIZE,
 				 "initial hash size too small compared to array size");
 
 /*
- * To speed up bulk releasing or reassigning locks from a resource owner to
- * its parent, each resource owner has a small cache of locks it owns. The
- * lock manager has the same information in its local lock hash table, and
- * we fall back on that if cache overflows, but traversing the hash table
- * is slower when there are a lot of locks belonging to other resource owners.
- *
- * MAX_RESOWNER_LOCKS is the size of the per-resource owner cache. It's
+ * MAX_RESOWNER_LOCKS is the size of the per-resource owner locks cache. It's
  * chosen based on some testing with pg_dump with a large schema. When the
  * tests were done (on 9.2), resource owners in a pg_dump run contained up
  * to 9 locks, regardless of the schema size, except for the top resource
@@ -88,33 +112,35 @@ typedef struct ResourceOwnerData
 	ResourceOwner nextchild;	/* next child of same parent */
 	const char *name;			/* name (just for debugging) */
 
+	bool		releasing;		/* has ResourceOwnerRelease been called? */
+
 	/*
-	 * These structs keep track of the objects registered with this owner.
+	 * The fixed-size array for recent resources.
 	 *
-	 * We manage a small set of references by keeping them in a simple array.
-	 * When the array gets full, all the elements in the array are moved to a
-	 * hash table.  This way, the array always contains a few most recently
-	 * remembered references.  To find a particular reference, you need to
-	 * search both the array and the hash table.
+	 * If 'releasing' is set, the contents are sorted by release priority.
 	 */
-	ResourceElem arr[RESOWNER_ARRAY_SIZE];
 	uint32		narr;			/* how many items are stored in the array */
+	ResourceElem arr[RESOWNER_ARRAY_SIZE];
 
 	/*
 	 * The hash table.  Uses open-addressing.  'nhash' is the number of items
 	 * present; if it would exceed 'grow_at', we enlarge it and re-hash.
 	 * 'grow_at' should be rather less than 'capacity' so that we don't waste
 	 * too much time searching for empty slots.
+	 *
+	 * If 'releasing' is set, the contents are no longer hashed, but sorted by
+	 * release priority.  The first 'nhash' elements are occupied, the rest
+	 * are empty.
 	 */
 	ResourceElem *hash;
 	uint32		nhash;			/* how many items are stored in the hash */
 	uint32		capacity;		/* allocated length of hash[] */
 	uint32		grow_at;		/* grow hash when reach this */
 
-	/* We can remember up to MAX_RESOWNER_LOCKS references to local locks. */
-	int			nlocks;			/* number of owned locks */
+	/* The local locks cache. */
+	uint32		nlocks;			/* number of owned locks */
 	LOCALLOCK  *locks[MAX_RESOWNER_LOCKS];	/* list of owned locks */
-} ResourceOwnerData;
+}			ResourceOwnerData;
 
 
 /*****************************************************************************
@@ -155,6 +181,8 @@ static ResourceReleaseCallbackItem *ResourceRelease_callbacks = NULL;
 static inline uint32 hash_resource_elem(Datum value, ResourceOwnerFuncs *kind);
 static void ResourceOwnerAddToHash(ResourceOwner owner, Datum value,
 								   ResourceOwnerFuncs *kind);
+static int resource_priority_cmp(const void *a, const void *b);
+static void ResourceOwnerSort(ResourceOwner owner);
 static void ResourceOwnerReleaseAll(ResourceOwner owner,
 									ResourceReleasePhase phase,
 									bool printLeakWarnings);
@@ -186,12 +214,12 @@ hash_resource_elem(Datum value, ResourceOwnerFuncs *kind)
 static void
 ResourceOwnerAddToHash(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind)
 {
-	/* Insert into first free slot at or after hash location. */
 	uint32		mask = owner->capacity - 1;
 	uint32		idx;
 
 	Assert(kind != NULL);
 
+	/* Insert into first free slot at or after hash location. */
 	idx = hash_resource_elem(value, kind) & mask;
 	for (;;)
 	{
@@ -205,84 +233,140 @@ ResourceOwnerAddToHash(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kin
 }
 
 /*
+ * Comparison function to sort by release phase and priority
+ */
+static int
+resource_priority_cmp(const void *a, const void *b)
+{
+	const ResourceElem *ra = (const ResourceElem *) a;
+	const ResourceElem *rb = (const ResourceElem *) b;
+
+	/* Note: reverse order */
+	if (ra->kind->release_phase == rb->kind->release_phase)
+	{
+		if (ra->kind->release_priority == rb->kind->release_priority)
+			return 0;
+		else if (ra->kind->release_priority > rb->kind->release_priority)
+			return -1;
+		else
+			return 1;
+	}
+	else if (ra->kind->release_phase > rb->kind->release_phase)
+		return -1;
+	else
+		return 1;
+}
+
+/*
+ * Sort resources in reverse release priority.
+ *
+ * If the hash table is in use, all the elements from the fixed-size array are
+ * moved to the hash table, and then the hash table is sorted.  If there is no
+ * hash table, then the fixed-size array is sorted directly.  In either case,
+ * the result is one sorted array that contains all the resources.
+ */
+static void
+ResourceOwnerSort(ResourceOwner owner)
+{
+	ResourceElem *items;
+	uint32		nitems;
+
+	if (!owner->hash)
+	{
+		items = owner->arr;
+		nitems = owner->narr;
+	}
+	else
+	{
+		/*
+		 * Compact the hash table, so that all the elements are in the
+		 * beginning of the 'hash' array, with no empty elements.
+		 */
+		uint32		dst = 0;
+
+		for (int idx = 0; idx < owner->capacity; idx++)
+		{
+			if (owner->hash[idx].kind != NULL)
+			{
+				if (dst != idx)
+					owner->hash[dst] = owner->hash[idx];
+				dst++;
+			}
+		}
+
+		/*
+		 * Move all entries from the fixed-size array to 'hash'.
+		 *
+		 * RESOWNER_HASH_MAX_ITEMS is defined so that there is always enough
+		 * free space to move all the elements from the fixed-size array to
+		 * the hash.
+		 */
+		Assert(dst + owner->narr <= owner->capacity);
+		for (int idx = 0; idx < owner->narr; idx++)
+		{
+			owner->hash[dst] = owner->arr[idx];
+			dst++;
+		}
+		Assert(dst == owner->nhash + owner->narr);
+		owner->narr = 0;
+		owner->nhash = dst;
+
+		items = owner->hash;
+		nitems = owner->nhash;
+	}
+
+	qsort(items, nitems, sizeof(ResourceElem), resource_priority_cmp);
+}
+
+/*
  * Call the ReleaseResource callback on entries with given 'phase'.
  */
 static void
 ResourceOwnerReleaseAll(ResourceOwner owner, ResourceReleasePhase phase,
 						bool printLeakWarnings)
 {
-	bool		found;
-	int			capacity;
+	ResourceElem *items;
+	uint32		nitems;
+
+	/* ResourceOwnerSort must've been called already */
+	Assert(owner->releasing);
+	if (!owner->hash)
+	{
+		items = owner->arr;
+		nitems = owner->narr;
+	}
+	else
+	{
+		Assert(owner->narr == 0);
+		items = owner->hash;
+		nitems = owner->nhash;
+	}
 
 	/*
-	 * First handle all the entries in the array.
-	 *
-	 * Note that ReleaseResource() will call ResourceOwnerForget) and remove
-	 * the entry from our array, so we just have to iterate till there is
-	 * nothing left to remove.
+	 * The resources are sorted in reverse priority order.  Release them
+	 * starting from the end, until we hit the end of the phase that we are
+	 * releasing now.  We will continue from there when called again for the
+	 * next phase.
 	 */
-	do
+	while (nitems > 0)
 	{
-		found = false;
-		for (int i = 0; i < owner->narr; i++)
-		{
-			if (owner->arr[i].kind->phase == phase)
-			{
-				Datum		value = owner->arr[i].item;
-				ResourceOwnerFuncs *kind = owner->arr[i].kind;
+		uint32		idx = nitems - 1;
+		Datum		value = items[idx].item;
+		ResourceOwnerFuncs *kind = items[idx].kind;
 
-				if (printLeakWarnings)
-					kind->PrintLeakWarning(value);
-				kind->ReleaseResource(value);
-				found = true;
-			}
-		}
+		if (kind->release_phase > phase)
+			break;
+		Assert(kind->release_phase == phase);
 
-		/*
-		 * If any resources were released, check again because some of the
-		 * elements might have been moved by the callbacks.  We don't want to
-		 * miss them.
-		 */
-	} while (found && owner->narr > 0);
-
-	/*
-	 * Ok, the array has now been handled.  Then the hash.  Like with the
-	 * array, ReleaseResource() will remove the entry from the hash.
-	 */
-	do
-	{
-		capacity = owner->capacity;
-		for (int idx = 0; idx < capacity; idx++)
-		{
-			while (owner->hash[idx].kind != NULL &&
-				   owner->hash[idx].kind->phase == phase)
-			{
-				Datum		value = owner->hash[idx].item;
-				ResourceOwnerFuncs *kind = owner->hash[idx].kind;
-
-				if (printLeakWarnings)
-					kind->PrintLeakWarning(value);
-				kind->ReleaseResource(value);
-
-				/*
-				 * If the same resource is remembered more than once in this
-				 * resource owner, the ReleaseResource callback might've
-				 * released a different copy of it.  Because of that, loop to
-				 * check the same index again.
-				 */
-			}
-		}
-
-		/*
-		 * It's possible that the callbacks acquired more resources, causing
-		 * the hash table to grow and the existing entries to be moved around.
-		 * If that happened, scan the hash table again, so that we don't miss
-		 * entries that were moved.  (XXX: I'm not sure if any of the
-		 * callbacks actually do that, but this is cheap to check, and better
-		 * safe than sorry.)
-		 */
-		Assert(owner->capacity >= capacity);
-	} while (capacity != owner->capacity);
+		if (printLeakWarnings)
+			kind->PrintLeakWarning(value);
+		kind->ReleaseResource(value);
+		nitems--;
+	}
+	if (!owner->hash)
+		owner->narr = nitems;
+	else
+		owner->nhash = nitems;
 }
 
 
@@ -335,10 +419,16 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 void
 ResourceOwnerEnlarge(ResourceOwner owner)
 {
+	/* Mustn't try to remember more resources after we have already started releasing */
+	if (owner->releasing)
+		elog(ERROR, "ResourceOwnerEnlarge called after release started");
+
 	if (owner->narr < RESOWNER_ARRAY_SIZE)
 		return;					/* no work needed */
 
-	/* Is there space in the hash? If not, enlarge it. */
+	/*
+	 * Is there space in the hash? If not, enlarge it.
+	 */
 	if (owner->narr + owner->nhash >= owner->grow_at)
 	{
 		uint32		i,
@@ -383,14 +473,11 @@ ResourceOwnerEnlarge(ResourceOwner owner)
 	}
 
 	/* Move items from the array to the hash */
-	Assert(owner->narr == RESOWNER_ARRAY_SIZE);
 	for (int i = 0; i < owner->narr; i++)
-	{
 		ResourceOwnerAddToHash(owner, owner->arr[i].item, owner->arr[i].kind);
-	}
 	owner->narr = 0;
 
-	Assert(owner->nhash < owner->grow_at);
+	Assert(owner->nhash <= owner->grow_at);
 }
 
 /*
@@ -408,13 +495,19 @@ ResourceOwnerRemember(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind
 		 resowner_trace_counter++, owner, DatumGetUInt64(value), kind->name);
 #endif
 
+	/*
+	 * Mustn't try to remember more resources after we have already started
+	 * releasing.  We already checked this in ResourceOwnerEnlarge.
+	 */
+	Assert(!owner->releasing);
+
 	if (owner->narr >= RESOWNER_ARRAY_SIZE)
 	{
 		/* forgot to call ResourceOwnerEnlarge? */
 		elog(ERROR, "ResourceOwnerRemember called but array was full");
 	}
 
-	/* Append to linear array. */
+	/* Append to the array. */
 	idx = owner->narr;
 	owner->arr[idx].item = value;
 	owner->arr[idx].kind = kind;
@@ -424,22 +517,27 @@ ResourceOwnerRemember(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind
 /*
  * Forget that an object is owned by a ResourceOwner
  *
- * Note: if same resource ID is associated with the ResourceOwner more than once,
- * one instance is removed.
+ * Note: if same resource ID is associated with the ResourceOwner more than
+ * once, one instance is removed.
  */
 void
 ResourceOwnerForget(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind)
 {
-	uint32		i,
-				idx;
-
 #ifdef RESOWNER_TRACE
 	elog(LOG, "FORGET %d: owner %p value " UINT64_FORMAT ", kind: %s",
 		 resowner_trace_counter++, owner, DatumGetUInt64(value), kind->name);
 #endif
 
-	/* Search through all items, but check the array first. */
-	for (i = 0; i < owner->narr; i++)
+	/*
+	 * Mustn't call this after we have already started releasing resources.
+	 * (Release callback functions are not allowed to release additional
+	 * resources.)
+	 */
+	if (owner->releasing)
+		elog(ERROR, "ResourceOwnerForget called for %s after release started", kind->name);
+
+	/* Search through all items in the array first. */
+	for (uint32 i = 0; i < owner->narr; i++)
 	{
 		if (owner->arr[i].item == value &&
 			owner->arr[i].kind == kind)
@@ -459,9 +557,10 @@ ResourceOwnerForget(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind)
 	if (owner->nhash > 0)
 	{
 		uint32		mask = owner->capacity - 1;
+		uint32		idx;
 
 		idx = hash_resource_elem(value, kind) & mask;
-		for (i = 0; i < owner->capacity; i++)
+		for (uint32 i = 0; i < owner->capacity; i++)
 		{
 			if (owner->hash[idx].item == value &&
 				owner->hash[idx].kind == kind)
@@ -473,6 +572,7 @@ ResourceOwnerForget(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind)
 #ifdef RESOWNER_STATS
 				nhash_lookups++;
 #endif
+
 				return;
 			}
 			idx = (idx + 1) & mask;
@@ -513,6 +613,12 @@ ResourceOwnerForget(ResourceOwner owner, Datum value, ResourceOwnerFuncs *kind)
  * isTopLevel is passed when we are releasing TopTransactionResourceOwner
  * at completion of a main transaction.  This generally means that *all*
  * resources will be released, and so we can optimize things a bit.
+ *
+ * NOTE: After starting the release process, by calling this function, no new
+ * resources can be remembered in the resource owner.  You also cannot call
+ * ResourceOwnerForget on any previously remembered resources to release
+ * resources "in retail" after that, you must let the bulk release take care
+ * of them.
  */
 void
 ResourceOwnerRelease(ResourceOwner owner,
@@ -549,8 +655,32 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		ResourceOwnerReleaseInternal(child, phase, isCommit, isTopLevel);
 
 	/*
-	 * Make CurrentResourceOwner point to me, so that ReleaseBuffer etc don't
-	 * get confused.
+	 * To release the resources in the right order, sort them by phase and
+	 * priority.
+	 *
+	 * The ReleaseResource callback functions are not allowed to remember or
+	 * forget any other resources after this. Otherwise we lose track of where
+	 * we are in processing the hash/array.
+	 */
+	if (!owner->releasing)
+	{
+		Assert(phase == RESOURCE_RELEASE_BEFORE_LOCKS);
+		ResourceOwnerSort(owner);
+		owner->releasing = true;
+	}
+	else
+	{
+		/*
+		 * Phase is normally > RESOURCE_RELEASE_BEFORE_LOCKS, if this is not
+		 * the first call to ReleaseOwnerRelease. But if an error happens
+		 * between the release phases, we might get called again for the same
+		 * ResourceOwner from AbortTransaction.
+		 */
+	}
+
+	/*
+	 * Make CurrentResourceOwner point to me, so that the release callback
+	 * functions know which resource owner is been released.
 	 */
 	save = CurrentResourceOwner;
 	CurrentResourceOwner = owner;
@@ -634,52 +764,53 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 }
 
 /*
- * ResourceOwnerReleaseAllPlanCacheRefs
- *		Release the plancache references (only) held by this owner.
- *
- * We might eventually add similar functions for other resource types,
- * but for now, only this is needed.
+ * ResourceOwnerReleaseAllOfKind
+ *		Release all resources of a certain type held by this owner.
  */
 void
-ResourceOwnerReleaseAllPlanCacheRefs(ResourceOwner owner)
+ResourceOwnerReleaseAllOfKind(ResourceOwner owner, ResourceOwnerFuncs *kind)
 {
-	/* array first */
+	/* Mustn't call this after we have already started releasing resources. */
+	if (owner->releasing)
+		elog(ERROR, "ResourceOwnerForget called for %s after release started", kind->name);
+
+	/*
+	 * Temporarily set 'releasing', to prevent calls to ResourceOwnerRemember
+	 * while we're scanning the owner.  Enlarging the hash would cause us to
+	 * lose track of the point we're scanning.
+	 */
+	owner->releasing = true;
+
+	/* Array first */
 	for (int i = 0; i < owner->narr; i++)
 	{
-		if (owner->arr[i].kind == &planref_resowner_funcs)
+		if (owner->arr[i].kind == kind)
 		{
-			CachedPlan *planref = (CachedPlan *) DatumGetPointer(owner->arr[i].item);
+			Datum		value = owner->arr[i].item;
 
 			owner->arr[i] = owner->arr[owner->narr - 1];
 			owner->narr--;
 			i--;
 
-			/*
-			 * pass 'NULL' because we already removed the entry from the
-			 * resowner
-			 */
-			ReleaseCachedPlan(planref, NULL);
+			kind->ReleaseResource(value);
 		}
 	}
 
 	/* Then hash */
 	for (int i = 0; i < owner->capacity; i++)
 	{
-		if (owner->hash[i].kind == &planref_resowner_funcs)
+		if (owner->hash[i].kind == kind)
 		{
-			CachedPlan *planref = (CachedPlan *) DatumGetPointer(owner->hash[i].item);
+			Datum		value = owner->hash[i].item;
 
 			owner->hash[i].item = (Datum) 0;
 			owner->hash[i].kind = NULL;
 			owner->nhash--;
 
-			/*
-			 * pass 'NULL' because we already removed the entry from the
-			 * resowner
-			 */
-			ReleaseCachedPlan(planref, NULL);
+			kind->ReleaseResource(value);
 		}
 	}
+	owner->releasing = false;
 }
 
 /*
@@ -857,6 +988,8 @@ ReleaseAuxProcessResources(bool isCommit)
 	ResourceOwnerRelease(AuxProcessResourceOwner,
 						 RESOURCE_RELEASE_AFTER_LOCKS,
 						 isCommit, true);
+	/* allow it to be reused */
+	AuxProcessResourceOwner->releasing = false;
 }
 
 /*
@@ -874,7 +1007,7 @@ ReleaseAuxProcessResourcesCallback(int code, Datum arg)
 /*
  * Remember that a Local Lock is owned by a ResourceOwner
  *
- * This is different from the other Remember functions in that the list of
+ * This is different from the generic ResourceOwnerRemember in that the list of
  * locks is only a lossy cache.  It can hold up to MAX_RESOWNER_LOCKS entries,
  * and when it overflows, we stop tracking locks.  The point of only remembering
  * only up to MAX_RESOWNER_LOCKS entries is that if a lot of locks are held,

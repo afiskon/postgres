@@ -356,7 +356,8 @@ static void ResOwnerPrintFileLeakWarning(Datum res);
 static ResourceOwnerFuncs file_resowner_funcs =
 {
 	.name = "File",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_FILES,
 	.ReleaseResource = ResOwnerReleaseFile,
 	.PrintLeakWarning = ResOwnerPrintFileLeakWarning
 };
@@ -3757,13 +3758,20 @@ data_sync_elevel(int elevel)
 	return data_sync_retry ? elevel : PANIC;
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseFile(Datum res)
 {
-	FileClose((File) DatumGetInt32(res));
+	File		file = (File) DatumGetInt32(res);
+	Vfd		   *vfdP;
+
+	Assert(FileIsValid(file));
+
+	vfdP = &VfdCache[file];
+	vfdP->resowner = NULL;
+
+	FileClose(file);
 }
 
 static void

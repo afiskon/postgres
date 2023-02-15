@@ -39,9 +39,9 @@ static void ResOwnerPrintTupleDescLeakWarning(Datum res);
 
 static ResourceOwnerFuncs tupdesc_resowner_funcs =
 {
-	/* relcache references */
 	.name = "tupdesc reference",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_TUPDESC_REFS,
 	.ReleaseResource = ResOwnerReleaseTupleDesc,
 	.PrintLeakWarning = ResOwnerPrintTupleDescLeakWarning
 };
@@ -947,13 +947,17 @@ BuildDescFromLists(List *names, List *types, List *typmods, List *collations)
 }
 
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseTupleDesc(Datum res)
 {
-	DecrTupleDescRefCount((TupleDesc) DatumGetPointer(res));
+	TupleDesc tupdesc = (TupleDesc) DatumGetPointer(res);
+
+	/* Like DecrTupleDescRefCount, but don't call ResourceOwnerForget() */
+	Assert(tupdesc->tdrefcount > 0);
+	if (--tupdesc->tdrefcount == 0)
+		FreeTupleDesc(tupdesc);
 }
 
 static void

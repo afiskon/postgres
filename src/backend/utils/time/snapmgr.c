@@ -173,6 +173,7 @@ static List *exportedSnapshots = NIL;
 /* Prototypes for local functions */
 static TimestampTz AlignTimestampToMinuteBoundary(TimestampTz ts);
 static Snapshot CopySnapshot(Snapshot snapshot);
+static void UnregisterSnapshotNoOwner(Snapshot snapshot);
 static void FreeSnapshot(Snapshot snapshot);
 static void SnapshotResetXmin(void);
 
@@ -183,7 +184,8 @@ static void ResOwnerPrintSnapshotLeakWarning(Datum res);
 static ResourceOwnerFuncs snapshot_resowner_funcs =
 {
 	.name = "snapshot reference",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_SNAPSHOT_REFS,
 	.ReleaseResource = ResOwnerReleaseSnapshot,
 	.PrintLeakWarning = ResOwnerPrintSnapshotLeakWarning
 };
@@ -905,10 +907,15 @@ UnregisterSnapshotFromOwner(Snapshot snapshot, ResourceOwner owner)
 	if (snapshot == NULL)
 		return;
 
+	ResourceOwnerForgetSnapshot(owner, snapshot);
+	UnregisterSnapshotNoOwner(snapshot);
+}
+
+static void
+UnregisterSnapshotNoOwner(Snapshot snapshot)
+{
 	Assert(snapshot->regd_count > 0);
 	Assert(!pairingheap_is_empty(&RegisteredSnapshots));
-
-	ResourceOwnerForgetSnapshot(owner, snapshot);
 
 	snapshot->regd_count--;
 	if (snapshot->regd_count == 0)
@@ -2399,13 +2406,12 @@ XidInMVCCSnapshot(TransactionId xid, Snapshot snapshot)
 	return false;
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseSnapshot(Datum res)
 {
-	UnregisterSnapshot((Snapshot) DatumGetPointer(res));
+	UnregisterSnapshotNoOwner((Snapshot) DatumGetPointer(res));
 }
 
 static void

@@ -42,6 +42,11 @@ extern PGDLLIMPORT ResourceOwner AuxProcessResourceOwner;
  * when we release a lock that another backend may be waiting on, it will
  * see us as being fully out of our transaction.  The post-lock phase
  * should be used for backend-internal cleanup.
+ *
+ * Within each phase, resources are released in priority order.  Priority is
+ * just an integer specified in ResourceOwnerFuncs.  The priorities of
+ * built-in resource types are given below, extensions may use any priority
+ * relative to those or RELEASE_PRIO_FIRST/LAST.
  */
 typedef enum
 {
@@ -49,6 +54,27 @@ typedef enum
 	RESOURCE_RELEASE_LOCKS,
 	RESOURCE_RELEASE_AFTER_LOCKS
 } ResourceReleasePhase;
+
+typedef uint32 ResourceReleasePriority;
+
+/* priorities of built-in BEFORE_LOCKS resources */
+#define RELEASE_PRIO_BUFFERS			    100
+#define RELEASE_PRIO_RELCACHE_REFS			200
+#define RELEASE_PRIO_DSMS					300
+#define RELEASE_PRIO_JIT_CONTEXTS			400
+#define RELEASE_PRIO_CRYPTOHASH_CONTEXTS	500
+#define RELEASE_PRIO_HMAC_CONTEXTS			600
+
+/* priorities of built-in AFTER_LOCKS resources */
+#define RELEASE_PRIO_CATCACHE_REFS			100
+#define RELEASE_PRIO_CATCACHE_LIST_REFS		200
+#define RELEASE_PRIO_PLANCACHE_REFS			300
+#define RELEASE_PRIO_TUPDESC_REFS			400
+#define RELEASE_PRIO_SNAPSHOT_REFS			500
+#define RELEASE_PRIO_FILES					600
+
+#define RELEASE_PRIO_FIRST					0
+#define RELEASE_PRIO_LAST					UINT32_MAX
 
 /*
  * In order to track an object, resowner.c needs a few callbacks for it.
@@ -62,13 +88,18 @@ typedef struct ResourceOwnerFuncs
 {
 	const char *name;			/* name for the object kind, for debugging */
 
-	ResourceReleasePhase phase; /* when are these objects released? */
+	/* when are these objects released? */
+	ResourceReleasePhase release_phase;
+	ResourceReleasePriority release_priority;
 
 	/*
 	 * Release resource.
 	 *
-	 * NOTE: this must call ResourceOwnerForget to disassociate it with the
-	 * resource owner.
+	 * This is called for each resource in the resource owner, in the order
+	 * specified by 'release_phase' and 'release_priority' when the whole
+	 * resource owner is been released or when ResourceOwnerReleaseAllOfKind()
+	 * is called.  The resource is implicitly removed from the owner, the
+	 * callback function doesn't need to call ResourceOwnerForget.
 	 */
 	void		(*ReleaseResource) (Datum res);
 
@@ -110,6 +141,8 @@ extern void ResourceOwnerEnlarge(ResourceOwner owner);
 extern void ResourceOwnerRemember(ResourceOwner owner, Datum res, ResourceOwnerFuncs *kind);
 extern void ResourceOwnerForget(ResourceOwner owner, Datum res, ResourceOwnerFuncs *kind);
 
+extern void ResourceOwnerReleaseAllOfKind(ResourceOwner owner, ResourceOwnerFuncs *kind);
+
 extern void RegisterResourceReleaseCallback(ResourceReleaseCallback callback,
 											void *arg);
 extern void UnregisterResourceReleaseCallback(ResourceReleaseCallback callback,
@@ -122,8 +155,5 @@ extern void ReleaseAuxProcessResources(bool isCommit);
 struct LOCALLOCK;
 extern void ResourceOwnerRememberLock(ResourceOwner owner, struct LOCALLOCK *locallock);
 extern void ResourceOwnerForgetLock(ResourceOwner owner, struct LOCALLOCK *locallock);
-
-/* special function to relase all plancache references */
-extern void ResourceOwnerReleaseAllPlanCacheRefs(ResourceOwner owner);
 
 #endif							/* RESOWNER_H */

@@ -79,9 +79,9 @@ static void ResOwnerPrintHMACLeakWarning(Datum res);
 
 static ResourceOwnerFuncs hmac_resowner_funcs =
 {
-	/* relcache references */
 	.name = "OpenSSL HMAC context",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_HMAC_CONTEXTS,
 	.ReleaseResource = ResOwnerReleaseHMAC,
 	.PrintLeakWarning = ResOwnerPrintHMACLeakWarning,
 };
@@ -323,7 +323,8 @@ pg_hmac_free(pg_hmac_ctx *ctx)
 #ifdef HAVE_HMAC_CTX_FREE
 	HMAC_CTX_free(ctx->hmacctx);
 #ifndef FRONTEND
-	ResourceOwnerForgetHMAC(ctx->resowner, ctx);
+	if (ctx->resowner)
+		ResourceOwnerForgetHMAC(ctx->resowner, ctx);
 #endif
 #else
 	explicit_bzero(ctx->hmacctx, sizeof(HMAC_CTX));
@@ -367,14 +368,16 @@ pg_hmac_error(pg_hmac_ctx *ctx)
 	return _("success");
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 #ifndef FRONTEND
 static void
 ResOwnerReleaseHMAC(Datum res)
 {
-	pg_hmac_free((pg_hmac_ctx *) DatumGetPointer(res));
+	pg_hmac_ctx *ctx = (pg_hmac_ctx *) DatumGetPointer(res);
+
+	ctx->resowner = NULL;
+	pg_hmac_free(ctx);
 }
 
 static void

@@ -215,7 +215,8 @@ static void ResOwnerPrintBufferLeakWarning(Datum res);
 ResourceOwnerFuncs buffer_resowner_funcs =
 {
 	.name = "buffer",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_BUFFERS,
 	.ReleaseResource = ResOwnerReleaseBuffer,
 	.PrintLeakWarning = ResOwnerPrintBufferLeakWarning
 };
@@ -469,6 +470,7 @@ static Buffer ReadBuffer_common(SMgrRelation smgr, char relpersistence,
 static bool PinBuffer(BufferDesc *buf, BufferAccessStrategy strategy);
 static void PinBuffer_Locked(BufferDesc *buf);
 static void UnpinBuffer(BufferDesc *buf);
+static void UnpinBufferNoOwner(BufferDesc *buf);
 static void BufferSync(int flags);
 static uint32 WaitBufHdrUnlocked(BufferDesc *buf);
 static int	SyncOneBuffer(int buf_id, bool skip_recently_used,
@@ -1909,16 +1911,23 @@ PinBuffer_Locked(BufferDesc *buf)
 static void
 UnpinBuffer(BufferDesc *buf)
 {
+	Buffer		b = BufferDescriptorGetBuffer(buf);
+
+	ResourceOwnerForgetBuffer(CurrentResourceOwner, b);
+	UnpinBufferNoOwner(buf);
+}
+
+static void
+UnpinBufferNoOwner(BufferDesc *buf)
+{
 	PrivateRefCountEntry *ref;
 	Buffer		b = BufferDescriptorGetBuffer(buf);
 
 	/* not moving as we're likely deleting it soon anyway */
 	ref = GetPrivateRefCountEntry(b, false);
 	Assert(ref != NULL);
-
-	ResourceOwnerForgetBuffer(CurrentResourceOwner, b);
-
 	Assert(ref->refcount > 0);
+
 	ref->refcount--;
 	if (ref->refcount == 0)
 	{
@@ -4000,16 +4009,17 @@ ReleaseBuffer(Buffer buffer)
 	if (!BufferIsValid(buffer))
 		elog(ERROR, "bad buffer ID: %d", buffer);
 
+	ResourceOwnerForgetBuffer(CurrentResourceOwner, buffer);
+
 	if (BufferIsLocal(buffer))
 	{
-		ResourceOwnerForgetBuffer(CurrentResourceOwner, buffer);
-
 		Assert(LocalRefCount[-buffer - 1] > 0);
 		LocalRefCount[-buffer - 1]--;
-		return;
 	}
-
-	UnpinBuffer(GetBufferDescriptor(buffer - 1));
+	else
+	{
+		UnpinBufferNoOwner(GetBufferDescriptor(buffer - 1));
+	}
 }
 
 /*
@@ -5091,13 +5101,26 @@ TestForOldSnapshot_impl(Snapshot snapshot, Relation relation)
 				 errmsg("snapshot too old")));
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseBuffer(Datum res)
 {
-	ReleaseBuffer(DatumGetInt32(res));
+	Buffer buffer = DatumGetInt32(res);
+
+	/* Like ReleaseBuffer, but don't call ResourceOwnerForgetBuffer */
+	if (!BufferIsValid(buffer))
+		elog(ERROR, "bad buffer ID: %d", buffer);
+
+	if (BufferIsLocal(buffer))
+	{
+		Assert(LocalRefCount[-buffer - 1] > 0);
+		LocalRefCount[-buffer - 1]--;
+	}
+	else
+	{
+		UnpinBufferNoOwner(GetBufferDescriptor(buffer - 1));
+	}
 }
 
 static void

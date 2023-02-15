@@ -95,6 +95,8 @@ static CatCTup *CatalogCacheCreateEntry(CatCache *cache, HeapTuple ntp,
 										uint32 hashValue, Index hashIndex,
 										bool negative);
 
+static void ReleaseCatCacheWithOwner(HeapTuple tuple, ResourceOwner resowner);
+static void ReleaseCatCacheListWithOwner(CatCList *list, ResourceOwner resowner);
 static void CatCacheFreeKeys(TupleDesc tupdesc, int nkeys, int *attnos,
 							 Datum *keys);
 static void CatCacheCopyKeys(TupleDesc tupdesc, int nkeys, int *attnos,
@@ -116,7 +118,8 @@ static ResourceOwnerFuncs catcache_resowner_funcs =
 {
 	/* catcache references */
 	.name = "catcache reference",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_CATCACHE_REFS,
 	.ReleaseResource = ResOwnerReleaseCatCache,
 	.PrintLeakWarning = ResOwnerPrintCatCacheLeakWarning
 };
@@ -125,7 +128,8 @@ static ResourceOwnerFuncs catlistref_resowner_funcs =
 {
 	/* catcache-list pins */
 	.name = "catcache list reference",
-	.phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_phase = RESOURCE_RELEASE_AFTER_LOCKS,
+	.release_priority = RELEASE_PRIO_CATCACHE_LIST_REFS,
 	.ReleaseResource = ResOwnerReleaseCatCacheList,
 	.PrintLeakWarning = ResOwnerPrintCatCacheListLeakWarning
 };
@@ -1471,6 +1475,12 @@ SearchCatCacheMiss(CatCache *cache,
 void
 ReleaseCatCache(HeapTuple tuple)
 {
+	ReleaseCatCacheWithOwner(tuple, CurrentResourceOwner);
+}
+
+static void
+ReleaseCatCacheWithOwner(HeapTuple tuple, ResourceOwner resowner)
+{
 	CatCTup    *ct = (CatCTup *) (((char *) tuple) -
 								  offsetof(CatCTup, tuple));
 
@@ -1479,7 +1489,8 @@ ReleaseCatCache(HeapTuple tuple)
 	Assert(ct->refcount > 0);
 
 	ct->refcount--;
-	ResourceOwnerForgetCatCacheRef(CurrentResourceOwner, &ct->tuple);
+	if (resowner)
+		ResourceOwnerForgetCatCacheRef(CurrentResourceOwner, &ct->tuple);
 
 	if (
 #ifndef CATCACHE_FORCE_RELEASE
@@ -1819,11 +1830,18 @@ SearchCatCacheList(CatCache *cache,
 void
 ReleaseCatCacheList(CatCList *list)
 {
+	ReleaseCatCacheListWithOwner(list, CurrentResourceOwner);
+}
+
+static void
+ReleaseCatCacheListWithOwner(CatCList *list, ResourceOwner resowner)
+{
 	/* Safety checks to ensure we were handed a cache entry */
 	Assert(list->cl_magic == CL_MAGIC);
 	Assert(list->refcount > 0);
 	list->refcount--;
-	ResourceOwnerForgetCatCacheListRef(CurrentResourceOwner, list);
+	if (resowner)
+		ResourceOwnerForgetCatCacheListRef(CurrentResourceOwner, list);
 
 	if (
 #ifndef CATCACHE_FORCE_RELEASE
@@ -2099,13 +2117,12 @@ PrepareToInvalidateCacheTuple(Relation relation,
 	}
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 static void
 ResOwnerReleaseCatCache(Datum res)
 {
-	ReleaseCatCache((HeapTuple) DatumGetPointer(res));
+	ReleaseCatCacheWithOwner((HeapTuple) DatumGetPointer(res), NULL);
 }
 
 static void
@@ -2128,7 +2145,7 @@ ResOwnerPrintCatCacheLeakWarning(Datum res)
 static void
 ResOwnerReleaseCatCacheList(Datum res)
 {
-	ReleaseCatCacheList((CatCList *) DatumGetPointer(res));
+	ReleaseCatCacheListWithOwner((CatCList *) DatumGetPointer(res), NULL);
 }
 
 static void

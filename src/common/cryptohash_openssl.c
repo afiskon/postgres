@@ -80,9 +80,9 @@ static void ResOwnerPrintCryptoHashLeakWarning(Datum res);
 
 static ResourceOwnerFuncs cryptohash_resowner_funcs =
 {
-	/* relcache references */
 	.name = "OpenSSL cryptohash context",
-	.phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_phase = RESOURCE_RELEASE_BEFORE_LOCKS,
+	.release_priority = RELEASE_PRIO_CRYPTOHASH_CONTEXTS,
 	.ReleaseResource = ResOwnerReleaseCryptoHash,
 	.PrintLeakWarning = ResOwnerPrintCryptoHashLeakWarning,
 };
@@ -326,7 +326,8 @@ pg_cryptohash_free(pg_cryptohash_ctx *ctx)
 	EVP_MD_CTX_destroy(ctx->evpctx);
 
 #ifndef FRONTEND
-	ResourceOwnerForgetCryptoHash(ctx->resowner, ctx);
+	if (ctx->resowner)
+		ResourceOwnerForgetCryptoHash(ctx->resowner, ctx);
 #endif
 
 	explicit_bzero(ctx, sizeof(pg_cryptohash_ctx));
@@ -370,14 +371,16 @@ pg_cryptohash_error(pg_cryptohash_ctx *ctx)
 	return _("success");
 }
 
-/*
- * ResourceOwner callbacks
- */
+/* ResourceOwner callbacks */
+
 #ifndef FRONTEND
 static void
 ResOwnerReleaseCryptoHash(Datum res)
 {
-	pg_cryptohash_free((pg_cryptohash_ctx *) DatumGetPointer(res));
+	pg_cryptohash_ctx *ctx = (pg_cryptohash_ctx *) DatumGetPointer(res);
+
+	ctx->resowner = NULL;
+	pg_cryptohash_free(ctx);
 }
 
 static void
