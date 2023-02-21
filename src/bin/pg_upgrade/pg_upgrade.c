@@ -38,6 +38,7 @@
 
 #include "postgres_fe.h"
 
+#include <dirent.h>
 #include <time.h>
 
 #ifdef HAVE_LANGINFO_H
@@ -567,28 +568,7 @@ copy_subdir_files(const char *old_subdir, const char *new_subdir)
 	check_ok();
 }
 
-// AALEKSEEV TODO FIXME: refactor vvv
-/******************************************************************************/
-#define SLRU_PAGES_PER_SEGMENT		32 /* Should be equal to value from slru.h */
-
-#define CLOG_BITS_PER_XACT		2
-#define CLOG_XACTS_PER_BYTE		4
-#define CLOG_XACTS_PER_PAGE		(BLCKSZ * CLOG_XACTS_PER_BYTE)
 /*
- * Rename the files from the old cluster into it
- */
-typedef struct SLRUSegmentState
-{
-	const char	   *dir;
-	FILE		   *file;
-	int64			segno;
-	int64			pageno;
-	bool			is_empty_segment;
-} SLRUSegmentState;
-
-/*
- * Old cluster SlruFileName (i.e. 32-bit)
- */
 static char *
 slru_filename_old(const char *path, int64 segno)
 {
@@ -596,276 +576,42 @@ slru_filename_old(const char *path, int64 segno)
 	return psprintf("%s/%04X", path, (int) segno);
 }
 
-/*
- * New cluster SlruFileName (i.e. 64-bit)
- */
 static char *
 slru_filename_new(const char *path, int64 segno)
 {
 	return psprintf("%s/%012llX", path, (long long) segno);
 }
-
-/*
- * Generalized fopen for SLRU segment file
- */
-static inline FILE *
-open_file(SLRUSegmentState *state,
-		  char * (filename_fn)(const char *path, int64 segno),
-		  char *mode, char *fatal_msg)
-{
-	char	*filename = filename_fn(state->dir, state->segno);
-	FILE	*fd = fopen(filename, mode);
-
-	if (!fd)
-		pg_fatal(fatal_msg, filename);
-
-	pfree(filename);
-
-	return fd;
-}
-
-/*
- * Generalized fclose for SLRU segment file
- */
-static void
-close_file(SLRUSegmentState *state,
-		   char * (filename_fn)(const char *path, int64 segno))
-{
-	if (state->file != NULL)
-	{
-		if (fclose(state->file) != 0)
-			pg_fatal("could not close file \"%s\": %m",
-					 filename_fn(state->dir, state->segno));
-		state->file = NULL;
-	}
-}
-
-/*
- * Generalized fread of BLCKSZ fro, SLRU segment file
- */
-static inline int
-read_file(SLRUSegmentState *state, void *buf)
-{
-	size_t		n = fread(buf, sizeof(char), BLCKSZ, state->file);
-
-	if (n != 0)
-		return n;
-
-	if (ferror(state->file))
-		pg_fatal("could not read file \"%s\": %m",
-				 slru_filename_old(state->dir, state->segno));
-
-	if (!feof(state->file))
-		pg_fatal("unknown file read state \"%s\": %m",
-				 slru_filename_old(state->dir, state->segno));
-
-	close_file(state, slru_filename_old);
-
-	return 0;
-}
-
-static int
-read_old_segment_page(SLRUSegmentState *state, void *buf, bool *is_empty)
-{
-	int		n;
-
-	/* Open next segment file, if needed */
-	if (!state->file)
-	{
-		state->file = open_file(state, slru_filename_old, "rb",
-								"could not open source file \"%s\": %m");
-
-		/* Set position to the needed page */
-		if (fseek(state->file, state->pageno * BLCKSZ, SEEK_SET))
-			close_file(state, slru_filename_old);
-
-		/*
-		 * Skip segment conversion if segment file doesn't exist.
-		 * First segment file should exist in any case.
-		 */
-		if (state->segno != 0)
-			state->is_empty_segment = true;
-	}
-
-	if (state->file)
-	{
-		/* Segment file does exist, read page from it */
-		state->is_empty_segment = false;
-
-		/* Try to read BLCKSZ bytes */
-		n = read_file(state, buf);
-		*is_empty = (n == 0);
-
-		/* Zeroing buf tail if needed */
-		if (n)
-			memset((char *) buf + n, 0, BLCKSZ - n);
-	}
-	else
-	{
-		n = state->is_empty_segment ?
-				BLCKSZ :	/* Skip empty block at the end of segment */
-				0;			/* We reached the last segment */
-		*is_empty = true;
-
-		if (n)
-			memset((char *) buf, 0, BLCKSZ);
-	}
-
-	state->pageno++;
-
-	if (state->pageno >= SLRU_PAGES_PER_SEGMENT)
-	{
-		/* Start new segment */
-		state->segno++;
-		state->pageno = 0;
-		close_file(state, slru_filename_old);
-	}
-
-	return n;
-}
+*/
 
 static void
-write_new_segment_page(SLRUSegmentState *state, void *buf, bool is_empty)
+convert_pg_xact_segments(const char *old_dir, const char *new_dir)
 {
-	/*
-	 * Create a new segment file if we still didn't.  Creation is postponed
-	 * until the first non-empty page is found.  This helps not to create
-	 * completely empty segments.
-	 */
-	if (!state->file && !is_empty)
-	{
-		state->file = open_file(state, slru_filename_new, "wb",
-								"could not open target file \"%s\": %m");
+	DIR* dir;
+	struct dirent *de;
 
-		/* Write zeroes to the previously skipped prefix */
-		if (state->pageno > 0)
-		{
-			char	zerobuf[BLCKSZ] = {0};
-
-			for (int64 i = 0; i < state->pageno; i++)
-			{
-				if (fwrite(zerobuf, sizeof(char), BLCKSZ, state->file) != BLCKSZ)
-					pg_fatal("could not write file \"%s\": %m",
-							 slru_filename_new(state->dir, state->segno));
-			}
-		}
-
-	}
-
-	/* Write page to the new segment (if it was created) */
-	if (state->file)
-	{
-		if (fwrite(buf, sizeof(char), BLCKSZ, state->file) != BLCKSZ)
-			pg_fatal("could not write file \"%s\": %m",
-					 slru_filename_new(state->dir, state->segno));
-	}
-
-	state->pageno++;
+	prep_status("AALEKSEEV DEBUG convert_pg_xact_segments(), old_dir = %s, new_dir = %s",
+		old_dir, new_dir);
 
 	/*
-	 * Did we reach the maximum page number? Then close segment file and
-	 * create a new one on the next iteration
+	 * Scan pg_xact directory and rename SLRU segments from pg_xact/XXXX
+	 * to pg_xact/00000000XXXX.
 	 */
-	if (state->pageno >= SLRU_PAGES_PER_SEGMENT)
+	dir = opendir(old_dir);
+	if (dir == NULL)
+		pg_fatal("could not open directory \"%s\": %m", old_dir);
+
+
+	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
-		state->segno++;
-		state->pageno = 0;
-		close_file(state, slru_filename_new);
+		prep_status("AALEKSEEV DEBUG de->d_name = %s", de->d_name);
 	}
+
+	if (errno)
+		pg_fatal("could not read directory \"%s\": %m", old_dir);
+
+	if (closedir(dir))
+		pg_fatal("could not close directory \"%s\": %m", old_dir);
 }
-
-/*
- * Convert pg_xact from 32bit to 64bit format.
- *
- * We read SLRU pages of pg_xact segments from old cluster one by one and write
- * them in a new segments files.
- *
- * AALEKSEEV TODO FIXME rewrite this
- */
-static void
-convert_pg_xact_segments(const char *old_subdir, const char *new_subdir)
-{
-	SLRUSegmentState	oldseg = {0};
-	SLRUSegmentState	newseg = {0};
-	char				buf[BLCKSZ] = {0};
-	FullTransactionId	oldestxid;
-	FullTransactionId	nxtxid;
-	uint32				epoch;
-	int64				pageno;
-	uint64				xid;
-
-	oldseg.dir = old_subdir;
-	newseg.dir = new_subdir;
-
-	prep_status("AALEKSEEV DEBUG convert_pg_xact_segments(), old_subdir = %s, new_subdir = %s",
-		old_subdir, new_subdir);
-
-	/* wraparound without epoch is not possible */
-	if (old_cluster.controldata.chkpnt_nxtepoch == 0 &&
-		old_cluster.controldata.chkpnt_oldstxid > old_cluster.controldata.chkpnt_nxtxid)
-	{
-		pg_fatal("inconsistent pg_xact of directory \"%s\"",
-				 old_cluster.pgdata);
-	}
-
-	/* get full transactions bounds from old cluster */
-	epoch = old_cluster.controldata.chkpnt_nxtepoch;
-	nxtxid = FullTransactionIdFromEpochAndXid(epoch,
-											  old_cluster.controldata.chkpnt_nxtxid);
-	if (old_cluster.controldata.chkpnt_oldstxid > XidFromFullTransactionId(nxtxid))
-		--epoch;
-
-	oldestxid = FullTransactionIdFromEpochAndXid(epoch,
-												 old_cluster.controldata.chkpnt_oldstxid);
-
-	/* get init segments and pages */
-	pageno = oldestxid.value / CLOG_XACTS_PER_PAGE;
-
-	oldseg.segno = pageno / SLRU_PAGES_PER_SEGMENT;
-	oldseg.pageno = pageno % SLRU_PAGES_PER_SEGMENT;
-
-	newseg.segno = pageno / SLRU_PAGES_PER_SEGMENT;
-	newseg.pageno = pageno % SLRU_PAGES_PER_SEGMENT;
-
-	/* Copy xid flags reading only needed segment pages */
-	for (xid = oldestxid.value & ~(CLOG_XACTS_PER_PAGE - 1);
-		 xid <= ((nxtxid.value - 1) & ~(CLOG_XACTS_PER_PAGE - 1));
-		 xid += CLOG_XACTS_PER_PAGE)
-	{
-		bool	is_empty;
-		int		len;
-
-		/* Handle possible segment wraparound */
-		if (oldseg.segno > MaxTransactionId / CLOG_XACTS_PER_PAGE / SLRU_PAGES_PER_SEGMENT)
-		{
-			Assert(!oldseg.pageno);
-			Assert(!oldseg.file);
-			Assert(!newseg.pageno);
-			Assert(!newseg.file);
-
-			oldseg.segno = 0;
-		}
-
-		len = read_old_segment_page(&oldseg, buf, &is_empty);
-
-		/*
-		 * Ignore read errors, copy all existing segment pages in the
-		 * interesting xid range.
-		 */
-		is_empty |= len <= 0;
-
-		Assert(len >= 0);
-		Assert(is_empty == false);
-
-		write_new_segment_page(&newseg, buf, is_empty);
-	}
-
-	/* Release resources */
-	close_file(&oldseg, slru_filename_old);
-	close_file(&newseg, slru_filename_new);
-}
-
-// ^^^ AALEKSEEV TODO FIXME - until here
 
 static void
 copy_xact_xlog_xid(void)
