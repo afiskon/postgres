@@ -576,7 +576,7 @@ IsSLRUSegmentWith32BitAddressing(const char *fname)
 }
 
 /*
- * Scan the given old SLRU directory (e.g. pg_xact) and move/link every
+ * Scan the given old SLRU directory (e.g. pg_xact) and copy/link every
  * old_dir/XXXX segment to new_dir/00000000XXXX.
  *
  * The naming was changed when we moved from 32-bit integer indexing of SLRU
@@ -610,6 +610,12 @@ convert_slru_segments(const char *old_dir, const char *new_dir)
 
 		snprintf(old_file, sizeof(old_file), "%s/%s", old_dir, de->d_name);
 		snprintf(new_file, sizeof(new_file), "%s/00000000%s", new_dir, de->d_name);
+
+		/*
+		 * Copy/link will fail if new_file already exists unless we explicitly
+		 * unlink it. It there is no new_file unlink does nothing.
+		 */
+		unlink(new_file);
 
 		switch (user_opts.transfer_mode)
 		{
