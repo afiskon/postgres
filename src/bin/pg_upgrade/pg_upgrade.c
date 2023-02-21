@@ -583,13 +583,20 @@ slru_filename_new(const char *path, int64 segno)
 }
 */
 
+static inline bool
+IsXactSegmentWith32BitAddressing(const char *fname)
+{
+	return (strlen(fname) == 4 && \
+			strspn(fname, "0123456789ABCDEF") == 4);
+}
+
 static void
 convert_pg_xact_segments(const char *old_dir, const char *new_dir)
 {
 	DIR* dir;
 	struct dirent *de;
 
-	prep_status("AALEKSEEV DEBUG convert_pg_xact_segments(), old_dir = %s, new_dir = %s",
+	prep_status("AALEKSEEV DEBUG convert_pg_xact_segments(), old_dir = %s, new_dir = %s\n",
 		old_dir, new_dir);
 
 	/*
@@ -603,7 +610,10 @@ convert_pg_xact_segments(const char *old_dir, const char *new_dir)
 
 	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
-		prep_status("AALEKSEEV DEBUG de->d_name = %s", de->d_name);
+		if(!IsXactSegmentWith32BitAddressing(de->d_name))
+			continue;
+
+		prep_status("AALEKSEEV DEBUG de->d_name = %s\n", de->d_name);
 	}
 
 	if (errno)
