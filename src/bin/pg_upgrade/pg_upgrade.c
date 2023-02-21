@@ -568,52 +568,65 @@ copy_subdir_files(const char *old_subdir, const char *new_subdir)
 	check_ok();
 }
 
-/*
-static char *
-slru_filename_old(const char *path, int64 segno)
-{
-	Assert(segno <= PG_INT32_MAX);
-	return psprintf("%s/%04X", path, (int) segno);
-}
-
-static char *
-slru_filename_new(const char *path, int64 segno)
-{
-	return psprintf("%s/%012llX", path, (long long) segno);
-}
-*/
-
 static inline bool
-IsXactSegmentWith32BitAddressing(const char *fname)
+IsSLRUSegmentWith32BitAddressing(const char *fname)
 {
 	return (strlen(fname) == 4 && \
 			strspn(fname, "0123456789ABCDEF") == 4);
 }
 
+/*
+ * Scan the given old SLRU directory (e.g. pg_xact) and move/link every
+ * old_dir/XXXX segment to new_dir/00000000XXXX.
+ *
+ * The naming was changed when we moved from 32-bit integer indexing of SLRU
+ * segments to 64-bit integer indexing.
+ */
 static void
-convert_pg_xact_segments(const char *old_dir, const char *new_dir)
+convert_slru_segments(const char *old_dir, const char *new_dir)
 {
 	DIR* dir;
 	struct dirent *de;
-
-	prep_status("AALEKSEEV DEBUG convert_pg_xact_segments(), old_dir = %s, new_dir = %s\n",
-		old_dir, new_dir);
-
+	char		old_file[MAXPGPATH];
+	char		new_file[MAXPGPATH];
 	/*
-	 * Scan pg_xact directory and rename SLRU segments from pg_xact/XXXX
-	 * to pg_xact/00000000XXXX.
+	 * These namespace and relation names are needed for the error messages.
+	 * Since here we are not dealing with any particular namespace or relation,
+	 * in an unlikely event of an error display "(none)".
 	 */
+	const char *nspname = "(none)";
+	const char *relname = "(none)";
+
 	dir = opendir(old_dir);
 	if (dir == NULL)
 		pg_fatal("could not open directory \"%s\": %m", old_dir);
 
-
 	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
-		if(!IsXactSegmentWith32BitAddressing(de->d_name))
+		/* Most importantly this check skips . and .. */
+		if(!IsSLRUSegmentWith32BitAddressing(de->d_name))
 			continue;
 
-		prep_status("AALEKSEEV DEBUG de->d_name = %s\n", de->d_name);
+		snprintf(old_file, sizeof(old_file), "%s/%s", old_dir, de->d_name);
+		snprintf(new_file, sizeof(new_file), "%s/00000000%s", new_dir, de->d_name);
+
+		switch (user_opts.transfer_mode)
+		{
+			case TRANSFER_MODE_CLONE:
+				pg_log(PG_VERBOSE, "cloning \"%s\" to \"%s\"",
+					   old_file, new_file);
+				cloneFile(old_file, new_file, nspname, relname);
+				break;
+			case TRANSFER_MODE_COPY:
+				pg_log(PG_VERBOSE, "copying \"%s\" to \"%s\"",
+					   old_file, new_file);
+				copyFile(old_file, new_file, nspname, relname);
+				break;
+			case TRANSFER_MODE_LINK:
+				pg_log(PG_VERBOSE, "linking \"%s\" to \"%s\"",
+					   old_file, new_file);
+				linkFile(old_file, new_file, nspname, relname);
+		}
 	}
 
 	if (errno)
@@ -638,7 +651,7 @@ copy_xact_xlog_xid(void)
 		char *old_path = psprintf("%s/%s", old_cluster.pgdata, GetClogDirName(old_cluster));
 		char *new_path = psprintf("%s/%s", new_cluster.pgdata, GetClogDirName(new_cluster));
 
-		convert_pg_xact_segments(old_path, new_path);
+		convert_slru_segments(old_path, new_path);
 		pfree(old_path);
 		pfree(new_path);
 	}
