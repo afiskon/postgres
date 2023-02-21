@@ -585,14 +585,15 @@ IsSLRUSegmentWith32BitAddressing(const char *fname)
 static void
 convert_slru_segments(const char *old_dir, const char *new_dir)
 {
-	DIR* dir;
+	DIR		   *dir;
 	struct dirent *de;
 	char		old_file[MAXPGPATH];
 	char		new_file[MAXPGPATH];
+
 	/*
 	 * These namespace and relation names are needed for the error messages.
-	 * Since here we are not dealing with any particular namespace or relation,
-	 * in an unlikely event of an error display "(none)".
+	 * Since here we are not dealing with any particular namespace or
+	 * relation, in an unlikely event of an error display "(none)".
 	 */
 	const char *nspname = "(none)";
 	const char *relname = "(none)";
@@ -604,7 +605,7 @@ convert_slru_segments(const char *old_dir, const char *new_dir)
 	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
 		/* Most importantly this check skips . and .. */
-		if(!IsSLRUSegmentWith32BitAddressing(de->d_name))
+		if (!IsSLRUSegmentWith32BitAddressing(de->d_name))
 			continue;
 
 		snprintf(old_file, sizeof(old_file), "%s/%s", old_dir, de->d_name);
@@ -648,8 +649,8 @@ copy_xact_xlog_xid(void)
 
 	if (old_cluster.controldata.cat_ver < SLRU_FORMAT_CHANGE_CAT_VER)
 	{
-		char *old_path = psprintf("%s/%s", old_cluster.pgdata, GetClogDirName(old_cluster));
-		char *new_path = psprintf("%s/%s", new_cluster.pgdata, GetClogDirName(new_cluster));
+		char	   *old_path = psprintf("%s/%s", old_cluster.pgdata, GetClogDirName(old_cluster));
+		char	   *new_path = psprintf("%s/%s", new_cluster.pgdata, GetClogDirName(new_cluster));
 
 		convert_slru_segments(old_path, new_path);
 		pfree(old_path);
