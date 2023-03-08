@@ -183,7 +183,7 @@ my $aborted_xid;
 my $node = PostgreSQL::Test::Cluster->new('test');
 $node->init;
 $node->append_conf('postgresql.conf', 'autovacuum=off');
-$node->append_conf('postgresql.conf','max_prepared_transactions=100');
+# $node->append_conf('postgresql.conf','max_prepared_transactions=100');
 
 # Start the node and load the extensions.  We depend on both
 # amcheck and pageinspect for this test.
