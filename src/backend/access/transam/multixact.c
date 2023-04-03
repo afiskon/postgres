@@ -1023,14 +1023,14 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 						 errmsg("database is not accepting commands that generate new MultiXactIds to avoid wraparound data loss in database \"%s\"",
 								oldest_datname),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("database is not accepting commands that generate new MultiXactIds to avoid wraparound data loss in database with OID %u",
 								oldest_datoid),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 		}
 
 		/*
@@ -1054,7 +1054,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 									   oldest_datname,
 									   multiWrapLimit - result),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 			else
 				ereport(WARNING,
 						(errmsg_plural("database with OID %u must be vacuumed before %u more MultiXactId is used",
@@ -1063,7 +1063,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 									   oldest_datoid,
 									   multiWrapLimit - result),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 		}
 
 		/* Re-acquire lock and start over */
@@ -2336,7 +2336,7 @@ SetMultiXactIdLimit(MultiXactId oldest_datminmxid, Oid oldest_datoid,
 								   oldest_datname,
 								   multiWrapLimit - curMulti),
 					 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-							 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+							 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 		else
 			ereport(WARNING,
 					(errmsg_plural("database with OID %u must be vacuumed before %u more MultiXactId is used",
@@ -2345,7 +2345,7 @@ SetMultiXactIdLimit(MultiXactId oldest_datminmxid, Oid oldest_datoid,
 								   oldest_datoid,
 								   multiWrapLimit - curMulti),
 					 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-							 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+							 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions. Ensure that autovacuum is progressing, or run a manual database-wide VACUUM.")));
 	}
 }
 
