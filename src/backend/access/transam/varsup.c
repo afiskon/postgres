@@ -129,14 +129,14 @@ GetNewTransactionId(bool isSubXact)
 						 errmsg("database is not accepting commands that generate new XIDs to avoid wraparound data loss in database \"%s\"",
 								oldest_datname),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("database is not accepting commands that generate new XIDs to avoid wraparound data loss in database with OID %u",
 								oldest_datoid),
 						 errhint("Execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 		}
 		else if (TransactionIdFollowsOrEquals(xid, xidWarnLimit))
 		{
@@ -149,14 +149,14 @@ GetNewTransactionId(bool isSubXact)
 								oldest_datname,
 								xidWrapLimit - xid),
 						 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 			else
 				ereport(WARNING,
 						(errmsg("database with OID %u must be vacuumed within %u transactions",
 								oldest_datoid,
 								xidWrapLimit - xid),
 						 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-								 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+								 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 		}
 
 		/* Re-acquire lock and start over */
@@ -464,14 +464,14 @@ SetTransactionIdLimit(TransactionId oldest_datfrozenxid, Oid oldest_datoid)
 							oldest_datname,
 							xidWrapLimit - curXid),
 					 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-							 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+							 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 		else
 			ereport(WARNING,
 					(errmsg("database with OID %u must be vacuumed within %u transactions",
 							oldest_datoid,
 							xidWrapLimit - curXid),
 					 errhint("To prevent entering read-only mode, execute a database-wide VACUUM in that database.\n"
-							 "You might also need to commit or roll back old prepared transactions, or drop stale replication slots.")));
+							 "You might also need to commit or roll back old prepared transactions, drop stale replication slots, or kill long-running sessions.")));
 	}
 }
 
