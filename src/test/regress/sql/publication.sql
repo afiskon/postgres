@@ -6,6 +6,18 @@ CREATE ROLE regress_publication_user2;
 CREATE ROLE regress_publication_user_dummy LOGIN NOSUPERUSER;
 SET SESSION AUTHORIZATION 'regress_publication_user';
 
+CREATE FUNCTION published_stream (VARIADIC pubnames text[])
+                RETURNS TABLE (pubname text, published regclass, synced regclass) AS $$
+  -- For each publication, show each published root alongside the tables which
+  -- are published via its OID.
+  SELECT p.pubname, rpi.pubasrelid::regclass, pr.prrelid::regclass
+    FROM pg_publication_rel pr
+    JOIN pg_publication p ON (p.oid = pr.prpubid),
+         pg_get_relation_publishing_info(pr.prrelid, VARIADIC pubnames) rpi
+   WHERE p.pubname = ANY (pubnames)
+   ORDER BY p.oid, 2, 3;
+$$ LANGUAGE sql;
+
 -- suppress warning that depends on wal_level
 SET client_min_messages = 'ERROR';
 CREATE PUBLICATION testpub_default;
@@ -1064,6 +1076,7 @@ SELECT * FROM pg_publication_tables;
 -- Table publication that includes both the parent table and the child table
 ALTER PUBLICATION pub ADD TABLE sch1.tbl1;
 SELECT * FROM pg_publication_tables;
+SELECT * FROM published_stream('pub');
 
 DROP PUBLICATION pub;
 -- Schema publication that does not include the schema that has the parent table
@@ -1078,6 +1091,7 @@ SELECT * FROM pg_publication_tables;
 -- Table publication that includes both the parent table and the child table
 ALTER PUBLICATION pub ADD TABLE sch1.tbl1;
 SELECT * FROM pg_publication_tables;
+SELECT * FROM published_stream('pub');
 
 DROP PUBLICATION pub;
 DROP TABLE sch2.tbl1_part1;
@@ -1096,6 +1110,7 @@ DROP PUBLICATION pub;
 DROP TABLE sch1.tbl1;
 DROP SCHEMA sch1 cascade;
 DROP SCHEMA sch2 cascade;
+DROP FUNCTION published_stream;
 
 RESET SESSION AUTHORIZATION;
 DROP ROLE regress_publication_user, regress_publication_user2;

@@ -1259,3 +1259,218 @@ pg_get_publication_tables(PG_FUNCTION_ARGS)
 
 	SRF_RETURN_DONE(funcctx);
 }
+
+List *
+process_relation_publications(Oid relid, const List *publications,
+							  PublicationActions *pubactions,
+							  Oid *publish_as_relid)
+{
+	Oid			schemaId = get_rel_namespace(relid);
+	List	   *pubids = GetRelationPublications(relid);
+
+	/*
+	 * We don't acquire a lock on the namespace system table as we build
+	 * the cache entry using a historic snapshot and all the later changes
+	 * are absorbed while decoding WAL.
+	 */
+	List	   *schemaPubids = GetSchemaPublications(schemaId);
+	ListCell   *lc;
+	int			publish_ancestor_level = 0;
+	bool		am_partition = get_rel_relispartition(relid);
+	char		relkind = get_rel_relkind(relid);
+	List	   *rel_publications = NIL;
+
+	*publish_as_relid = relid;
+
+	foreach(lc, publications)
+	{
+		Publication *pub = lfirst(lc);
+		bool		publish = false;
+
+		/*
+		 * Under what relid should we publish changes in this publication?
+		 * We'll use the top-most relid across all publications. Also
+		 * track the ancestor level for this publication.
+		 */
+		Oid			pub_relid = relid;
+		int			ancestor_level = 0;
+
+		/*
+		 * If this is a FOR ALL TABLES publication, pick the partition
+		 * root and set the ancestor level accordingly.
+		 */
+		if (pub->alltables)
+		{
+			publish = true;
+			if (pub->pubviaroot && am_partition)
+			{
+				List	   *ancestors = get_partition_ancestors(relid);
+
+				pub_relid = llast_oid(ancestors);
+				ancestor_level = list_length(ancestors);
+			}
+		}
+
+		if (!publish)
+		{
+			bool		ancestor_published = false;
+
+			/*
+			 * For a partition, check if any of the ancestors are
+			 * published.  If so, note down the topmost ancestor that is
+			 * published via this publication, which will be used as the
+			 * relation via which to publish the partition's changes.
+			 */
+			if (am_partition)
+			{
+				Oid			ancestor;
+				int			level;
+				List	   *ancestors = get_partition_ancestors(relid);
+
+				ancestor = GetTopMostAncestorInPublication(pub->oid,
+														   ancestors,
+														   &level);
+
+				if (ancestor != InvalidOid)
+				{
+					ancestor_published = true;
+					if (pub->pubviaroot)
+					{
+						pub_relid = ancestor;
+						ancestor_level = level;
+					}
+				}
+			}
+
+			if (list_member_oid(pubids, pub->oid) ||
+				list_member_oid(schemaPubids, pub->oid) ||
+				ancestor_published)
+				publish = true;
+		}
+
+		/*
+		 * If the relation is to be published, determine actions to
+		 * publish, and list of columns, if appropriate.
+		 *
+		 * Don't publish changes for partitioned tables, because
+		 * publishing those of its partitions suffices, unless partition
+		 * changes won't be published due to pubviaroot being set.
+		 */
+		if (publish &&
+			(relkind != RELKIND_PARTITIONED_TABLE || pub->pubviaroot))
+		{
+			pubactions->pubinsert |= pub->pubactions.pubinsert;
+			pubactions->pubupdate |= pub->pubactions.pubupdate;
+			pubactions->pubdelete |= pub->pubactions.pubdelete;
+			pubactions->pubtruncate |= pub->pubactions.pubtruncate;
+
+			/*
+			 * We want to publish the changes as the top-most ancestor
+			 * across all publications. So we need to check if the already
+			 * calculated level is higher than the new one. If yes, we can
+			 * ignore the new value (as it's a child). Otherwise the new
+			 * value is an ancestor, so we keep it.
+			 */
+			if (publish_ancestor_level > ancestor_level)
+				continue;
+
+			/*
+			 * If we found an ancestor higher up in the tree, discard the
+			 * list of publications through which we replicate it, and use
+			 * the new ancestor.
+			 */
+			if (publish_ancestor_level < ancestor_level)
+			{
+				*publish_as_relid = pub_relid;
+				publish_ancestor_level = ancestor_level;
+
+				/* reset the publication list for this relation */
+				rel_publications = NIL;
+			}
+			else
+			{
+				/* Same ancestor level, has to be the same OID. */
+				Assert(*publish_as_relid == pub_relid);
+			}
+
+			/* Track publications for this ancestor. */
+			rel_publications = lappend(rel_publications, pub);
+		}
+	}
+
+	list_free(pubids);
+	list_free(schemaPubids);
+
+	return rel_publications;
+}
+
+Datum
+pg_get_relation_publishing_info(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	List	   *publications = NIL;
+	ArrayType  *arr;
+	Datum	   *elems;
+	int			nelems,
+				i;
+	TupleDesc	tupdesc;
+	HeapTuple	htup;
+
+	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+		elog(ERROR, "return type must be a row type");
+
+	arr = PG_GETARG_ARRAYTYPE_P(1);
+	deconstruct_array(arr, TEXTOID, -1, false, TYPALIGN_INT, &elems, NULL,
+					  &nelems);
+
+	/* Get Oids of tables from each publication. */
+	for (i = 0; i < nelems; i++)
+	{
+		char	   *pubname = TextDatumGetCString(elems[i]);
+		Publication *pub = GetPublicationByName(pubname, false);
+
+		publications = lappend(publications, pub);
+	}
+
+	{
+		List	   *rel_publications;
+		PublicationActions pubactions;
+		Oid			publish_as_relid;
+		ListCell   *lc;
+		Datum	   *puboids;
+		ArrayType  *puboidarray;
+		Datum		values[6];
+		bool		nulls[6];
+
+		rel_publications =
+			process_relation_publications(relid, publications, &pubactions,
+										  &publish_as_relid);
+
+		/* Translate the rel_publications List into an OID array. */
+		puboids = palloc(sizeof(Datum) * list_length(rel_publications));
+
+		foreach(lc, rel_publications)
+		{
+			Publication *pub = lfirst(lc);
+
+			i = foreach_current_index(lc);
+			puboids[i] = ObjectIdGetDatum(pub->oid);
+		}
+
+		puboidarray = construct_array(puboids, list_length(rel_publications),
+									  OIDOID, sizeof(Oid), true, TYPALIGN_INT);
+
+		values[0] = PointerGetDatum(puboidarray);
+		values[1] = ObjectIdGetDatum(publish_as_relid);
+		values[2] = BoolGetDatum(pubactions.pubinsert);
+		values[3] = BoolGetDatum(pubactions.pubupdate);
+		values[4] = BoolGetDatum(pubactions.pubdelete);
+		values[5] = BoolGetDatum(pubactions.pubtruncate);
+
+		memset(nulls, false, sizeof(nulls));
+
+		htup = heap_form_tuple(tupdesc, values, nulls);
+	}
+
+	PG_RETURN_DATUM(HeapTupleGetDatum(htup));
+}
