@@ -43,6 +43,7 @@ package PostgreSQL::Test::Utils;
 
 use strict;
 use warnings;
+use locale;
 
 use Carp;
 use Config;
@@ -55,6 +56,7 @@ use File::Spec;
 use File::stat qw(stat);
 use File::Temp ();
 use IPC::Run;
+use POSIX qw(locale_h);
 use PostgreSQL::Test::SimpleTee;
 
 # We need a version of Test::More recent enough to support subtests
@@ -102,6 +104,7 @@ BEGIN
 	delete $ENV{LANGUAGE};
 	delete $ENV{LC_ALL};
 	$ENV{LC_MESSAGES} = 'C';
+	setlocale(LC_ALL, "");
 
 	# This list should be kept in sync with pg_regress.c.
 	my @envkeys = qw (
