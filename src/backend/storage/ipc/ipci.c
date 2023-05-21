@@ -311,7 +311,7 @@ CreateSharedMemoryAndSemaphores(void)
 	/*
 	 * Now give loadable modules a chance to set up their shmem allocations
 	 */
-	if (shmem_startup_hook)
+	if (!IsUnderPostmaster && shmem_startup_hook)
 		shmem_startup_hook();
 }
 

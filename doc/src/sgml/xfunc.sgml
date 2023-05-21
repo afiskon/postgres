@@ -3424,14 +3424,9 @@ void RequestNamedLWLockTranche(const char *tranche_name, int num_lwlocks)
      to get a pointer to this array.
     </para>
     <para>
-     An example of a <literal>shmem_request_hook</literal> can be found in
-     <filename>contrib/pg_stat_statements/pg_stat_statements.c</filename> in the
-     <productname>PostgreSQL</productname> source tree.
-    </para>
-    <para>
-     To avoid possible race-conditions, each backend should use the LWLock
-     <function>AddinShmemInitLock</function> when connecting to and initializing
-     its allocation of shared memory, as shown here:
+     Generally, to avoid possible race-conditions, each backend should use the
+     LWLock <function>AddinShmemInitLock</function> when connecting to and
+     initializing its allocation of shared memory, as shown here:
 <programlisting>
 static mystruct *ptr = NULL;
 
@@ -3450,6 +3445,25 @@ if (!ptr)
         LWLockRelease(AddinShmemInitLock);
 }
 </programlisting>
+    </para>
+    <para>
+    Alternatively an extension can use <literal>shmem_startup_hook</literal>.
+    This allows to place all the code responsible for initializing shared memory
+    in a single place. Additionally the hook is guaranteed to be called by
+    postmaster before creating any other child processes, similarly to
+    <function>_PG_init</function> and <literal>shmem_request_hook</literal>.
+    </para>
+    <para>
+    When using <literal>shmem_startup_hook</literal> there is no need to acquire
+    <function>AddinShmemInitLock</function>. Also in this case a pointer to
+    LWLocks tranche returned by <function>GetNamedLWLockTranche</function> can
+    be stored in local process memory. The memory is going to be inherited from
+    postmaster by the child processes.
+    </para>
+    <para>
+     An complete example of allocating shared memory and LWLocks can be found in
+     <filename>contrib/pg_stat_statements/pg_stat_statements.c</filename> in the
+     <productname>PostgreSQL</productname> source tree.
     </para>
    </sect2>
 

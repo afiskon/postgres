@@ -20,17 +20,17 @@
  * file are kept in shared memory.
  *
  * Note about locking issues: to create or delete an entry in the shared
- * hashtable, one must hold pgss->lock exclusively.  Modifying any field
+ * hashtable, one must hold pgss_lock exclusively.  Modifying any field
  * in an entry except the counters requires the same.  To look up an entry,
  * one must hold the lock shared.  To read or update the counters within
  * an entry, one must hold the lock shared or exclusive (so the entry doesn't
  * disappear!) and also take the entry's mutex spinlock.
  * The shared state variable pgss->extent (the next free spot in the external
  * query-text file) should be accessed only while holding either the
- * pgss->mutex spinlock, or exclusive lock on pgss->lock.  We use the mutex to
- * allow reserving file space while holding only shared lock on pgss->lock.
+ * pgss->mutex spinlock, or exclusive lock on pgss_lock.  We use the mutex to
+ * allow reserving file space while holding only shared lock on pgss_lock.
  * Rewriting the entire external query-text file, eg for garbage collection,
- * requires holding pgss->lock exclusively; this allows individual entries
+ * requires holding pgss_lock exclusively; this allows individual entries
  * in the file to be read or written while holding only shared lock.
  *
  *
@@ -228,12 +228,22 @@ typedef struct pgssEntry
 	slock_t		mutex;			/* protects the counters only */
 } pgssEntry;
 
+
+/*
+ * pgss_lock protects hashtable search/modification
+ *
+ * The value is initialized in shmem_startup_hook. The hook is guaranteed
+ * to be called from the postmaster before it fork()'s any other processes.
+ * Child processes are going to inherit pgss_lock value. For this reason it's
+ * not necessary (although possible) to store this value in shared memory.
+ */
+LWLock	   *pgss_lock = NULL;
+
 /*
  * Global shared state
  */
 typedef struct pgssSharedState
 {
-	LWLock	   *lock;			/* protects hashtable search/modification */
 	double		cur_median_usage;	/* current median usage in hashtable */
 	Size		mean_query_len; /* current mean entry text length */
 	slock_t		mutex;			/* protects following fields only: */
@@ -494,6 +504,10 @@ pgss_shmem_request(void)
  * then load any pre-existing statistics from file.
  * Also create and load the query-texts file, which is expected to exist
  * (even if empty) while the module is enabled.
+ *
+ * Note: we don't bother with locks here, because there should be no other
+ * processes running when this code is reached. The hook is guaranteed to be
+ * called by the postmaster before any other processes are going to be started.
  */
 static void
 pgss_shmem_startup(void)
@@ -509,6 +523,8 @@ pgss_shmem_startup(void)
 	int			buffer_size;
 	char	   *buffer = NULL;
 
+	Assert(!IsUnderPostmaster);
+
 	if (prev_shmem_startup_hook)
 		prev_shmem_startup_hook();
 
@@ -516,28 +532,21 @@ pgss_shmem_startup(void)
 	pgss = NULL;
 	pgss_hash = NULL;
 
-	/*
-	 * Create or attach to the shared memory state, including hash table
-	 */
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-
 	pgss = ShmemInitStruct("pg_stat_statements",
 						   sizeof(pgssSharedState),
 						   &found);
 
-	if (!found)
-	{
-		/* First time through ... */
-		pgss->lock = &(GetNamedLWLockTranche("pg_stat_statements"))->lock;
-		pgss->cur_median_usage = ASSUMED_MEDIAN_INIT;
-		pgss->mean_query_len = ASSUMED_LENGTH_INIT;
-		SpinLockInit(&pgss->mutex);
-		pgss->extent = 0;
-		pgss->n_writers = 0;
-		pgss->gc_count = 0;
-		pgss->stats.dealloc = 0;
-		pgss->stats.stats_reset = GetCurrentTimestamp();
-	}
+	Assert(!found);
+
+	pgss_lock = &(GetNamedLWLockTranche("pg_stat_statements"))->lock;
+	pgss->cur_median_usage = ASSUMED_MEDIAN_INIT;
+	pgss->mean_query_len = ASSUMED_LENGTH_INIT;
+	SpinLockInit(&pgss->mutex);
+	pgss->extent = 0;
+	pgss->n_writers = 0;
+	pgss->gc_count = 0;
+	pgss->stats.dealloc = 0;
+	pgss->stats.stats_reset = GetCurrentTimestamp();
 
 	info.keysize = sizeof(pgssHashKey);
 	info.entrysize = sizeof(pgssEntry);
@@ -546,25 +555,10 @@ pgss_shmem_startup(void)
 							  &info,
 							  HASH_ELEM | HASH_BLOBS);
 
-	LWLockRelease(AddinShmemInitLock);
-
 	/*
-	 * If we're in the postmaster (or a standalone backend...), set up a shmem
-	 * exit hook to dump the statistics to disk.
+	 * Set up a shmem exit hook to dump the statistics to disk.
 	 */
-	if (!IsUnderPostmaster)
-		on_shmem_exit(pgss_shmem_shutdown, (Datum) 0);
-
-	/*
-	 * Done if some other process already completed our initialization.
-	 */
-	if (found)
-		return;
-
-	/*
-	 * Note: we don't bother with locks here, because there should be no other
-	 * processes running when this code is reached.
-	 */
+	on_shmem_exit(pgss_shmem_shutdown, (Datum) 0);
 
 	/* Unlink query text file possibly left over from crash */
 	unlink(PGSS_TEXT_FILE);
@@ -1266,7 +1260,7 @@ pgss_store(const char *query, uint64 queryId,
 	key.toplevel = (exec_nested_level == 0);
 
 	/* Lookup the hash table entry with shared lock. */
-	LWLockAcquire(pgss->lock, LW_SHARED);
+	LWLockAcquire(pgss_lock, LW_SHARED);
 
 	entry = (pgssEntry *) hash_search(pgss_hash, &key, HASH_FIND, NULL);
 
@@ -1287,11 +1281,11 @@ pgss_store(const char *query, uint64 queryId,
 		 */
 		if (jstate)
 		{
-			LWLockRelease(pgss->lock);
+			LWLockRelease(pgss_lock);
 			norm_query = generate_normalized_query(jstate, query,
 												   query_location,
 												   &query_len);
-			LWLockAcquire(pgss->lock, LW_SHARED);
+			LWLockAcquire(pgss_lock, LW_SHARED);
 		}
 
 		/* Append new query text to file with only shared lock held */
@@ -1306,8 +1300,8 @@ pgss_store(const char *query, uint64 queryId,
 		do_gc = need_gc_qtexts();
 
 		/* Need exclusive lock to make a new hashtable entry - promote */
-		LWLockRelease(pgss->lock);
-		LWLockAcquire(pgss->lock, LW_EXCLUSIVE);
+		LWLockRelease(pgss_lock);
+		LWLockAcquire(pgss_lock, LW_EXCLUSIVE);
 
 		/*
 		 * A garbage collection may have occurred while we weren't holding the
@@ -1419,7 +1413,7 @@ pgss_store(const char *query, uint64 queryId,
 	}
 
 done:
-	LWLockRelease(pgss->lock);
+	LWLockRelease(pgss_lock);
 
 	/* We postpone this clean-up until we're out of the lock */
 	if (norm_query)
@@ -1612,7 +1606,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 
 	/*
 	 * We'd like to load the query text file (if needed) while not holding any
-	 * lock on pgss->lock.  In the worst case we'll have to do this again
+	 * lock on pgss_lock.  In the worst case we'll have to do this again
 	 * after we have the lock, but it's unlikely enough to make this a win
 	 * despite occasional duplicated work.  We need to reload if anybody
 	 * writes to the file (either a retail qtext_store(), or a garbage
@@ -1651,7 +1645,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 	 * we need to partition the hash table to limit the time spent holding any
 	 * one lock.
 	 */
-	LWLockAcquire(pgss->lock, LW_SHARED);
+	LWLockAcquire(pgss_lock, LW_SHARED);
 
 	if (showtext)
 	{
@@ -1851,7 +1845,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 		tuplestore_putvalues(rsinfo->setResult, rsinfo->setDesc, values, nulls);
 	}
 
-	LWLockRelease(pgss->lock);
+	LWLockRelease(pgss_lock);
 
 	free(qbuffer);
 }
@@ -1910,7 +1904,7 @@ pgss_memsize(void)
 
 /*
  * Allocate a new hashtable entry.
- * caller must hold an exclusive lock on pgss->lock
+ * caller must hold an exclusive lock on pgss_lock
  *
  * "query" need not be null-terminated; we rely on query_len instead
  *
@@ -1979,7 +1973,7 @@ entry_cmp(const void *lhs, const void *rhs)
 /*
  * Deallocate least-used entries.
  *
- * Caller must hold an exclusive lock on pgss->lock.
+ * Caller must hold an exclusive lock on pgss_lock.
  */
 static void
 entry_dealloc(void)
@@ -2070,7 +2064,7 @@ entry_dealloc(void)
  *
  * On failure, returns false.
  *
- * At least a shared lock on pgss->lock must be held by the caller, so as
+ * At least a shared lock on pgss_lock must be held by the caller, so as
  * to prevent a concurrent garbage collection.  Share-lock-holding callers
  * should pass a gc_count pointer to obtain the number of garbage collections,
  * so that they can recheck the count after obtaining exclusive lock to
@@ -2165,7 +2159,7 @@ error:
  *
  * On success, the buffer size is also returned into *buffer_size.
  *
- * This can be called without any lock on pgss->lock, but in that case
+ * This can be called without any lock on pgss_lock, but in that case
  * the caller is responsible for verifying that the result is sane.
  */
 static char *
@@ -2282,7 +2276,7 @@ qtext_fetch(Size query_offset, int query_len,
 /*
  * Do we need to garbage-collect the external query text file?
  *
- * Caller should hold at least a shared lock on pgss->lock.
+ * Caller should hold at least a shared lock on pgss_lock.
  */
 static bool
 need_gc_qtexts(void)
@@ -2331,7 +2325,7 @@ need_gc_qtexts(void)
  * becomes unreasonably large, with no other method of compaction likely to
  * occur in the foreseeable future.
  *
- * The caller must hold an exclusive lock on pgss->lock.
+ * The caller must hold an exclusive lock on pgss_lock.
  *
  * At the first sign of trouble we unlink the query text file to get a clean
  * slate (although existing statistics are retained), rather than risk
@@ -2458,7 +2452,7 @@ gc_qtexts(void)
 
 	/*
 	 * OK, count a garbage collection cycle.  (Note: even though we have
-	 * exclusive lock on pgss->lock, we must take pgss->mutex for this, since
+	 * exclusive lock on pgss_lock, we must take pgss->mutex for this, since
 	 * other processes may examine gc_count while holding only the mutex.
 	 * Also, we have to advance the count *after* we've rewritten the file,
 	 * else other processes might not realize they read a stale file.)
@@ -2507,12 +2501,12 @@ gc_fail:
 	 * Bump the GC count even though we failed.
 	 *
 	 * This is needed to make concurrent readers of file without any lock on
-	 * pgss->lock notice existence of new version of file.  Once readers
-	 * subsequently observe a change in GC count with pgss->lock held, that
+	 * pgss_lock notice existence of new version of file.  Once readers
+	 * subsequently observe a change in GC count with pgss_lock held, that
 	 * forces a safe reopen of file.  Writers also require that we bump here,
 	 * of course.  (As required by locking protocol, readers and writers don't
 	 * trust earlier file contents until gc_count is found unchanged after
-	 * pgss->lock acquired in shared or exclusive mode respectively.)
+	 * pgss_lock acquired in shared or exclusive mode respectively.)
 	 */
 	record_gc_qtexts();
 }
@@ -2535,7 +2529,7 @@ entry_reset(Oid userid, Oid dbid, uint64 queryid)
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("pg_stat_statements must be loaded via shared_preload_libraries")));
 
-	LWLockAcquire(pgss->lock, LW_EXCLUSIVE);
+	LWLockAcquire(pgss_lock, LW_EXCLUSIVE);
 	num_entries = hash_get_num_entries(pgss_hash);
 
 	if (userid != 0 && dbid != 0 && queryid != UINT64CONST(0))
@@ -2633,7 +2627,7 @@ done:
 	record_gc_qtexts();
 
 release_lock:
-	LWLockRelease(pgss->lock);
+	LWLockRelease(pgss_lock);
 }
 
 /*

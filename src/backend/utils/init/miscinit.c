@@ -1874,6 +1874,12 @@ process_session_preload_libraries(void)
 void
 process_shmem_requests(void)
 {
+	/*
+	 * The following assert ensures that shmem_request_hook is going to be
+	 * called only by the postmaster, as promised in the documentation.
+	 */
+	Assert(!IsUnderPostmaster);
+
 	process_shmem_requests_in_progress = true;
 	if (shmem_request_hook)
 		shmem_request_hook();
