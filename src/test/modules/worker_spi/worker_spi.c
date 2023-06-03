@@ -282,6 +282,9 @@ _PG_init(void)
 {
 	BackgroundWorker worker;
 
+	if (!process_shared_preload_libraries_in_progress)
+		return;
+
 	/* get the configuration */
 	DefineCustomIntVariable("worker_spi.naptime",
 							"Duration between each check (in seconds).",
@@ -295,9 +298,6 @@ _PG_init(void)
 							NULL,
 							NULL,
 							NULL);
-
-	if (!process_shared_preload_libraries_in_progress)
-		return;
 
 	DefineCustomIntVariable("worker_spi.total_workers",
 							"Number of workers.",
