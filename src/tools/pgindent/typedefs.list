@@ -1685,7 +1685,6 @@ OutputPluginCallbacks
 OutputPluginOptions
 OutputPluginOutputType
 OverrideSearchPath
-OverrideStackEntry
 OverridingKind
 PACE_HEADER
 PACL
