@@ -1,0 +1,237 @@
+CREATE EXTENSION pg_tracing;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000001-0000000000000001-01'*/ SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+-- Get top span id
+SELECT span_id AS top_span_id from pg_tracing_spans(false) where parent_id=1 and name!='Parse' \gset
+-- Check parameters
+SELECT parameters from pg_tracing_spans(false) where span_id=:top_span_id;
+ parameters 
+------------
+ $1 = 1
+(1 row)
+
+-- Check the number of children
+SELECT count(*) from pg_tracing_spans(false) where parent_id=:'top_span_id';
+ count 
+-------
+     5
+(1 row)
+
+-- Check resource
+SELECT resource from pg_tracing_spans(false) where trace_id=1 order by span_start;
+  resource  
+------------
+ Parse
+ SELECT $1;
+ Planner
+ Start
+ Run
+ Result
+ Finish
+ End
+(8 rows)
+
+-- Check reported number of trace
+SELECT traces from pg_tracing_info;
+ traces 
+--------
+      1
+(1 row)
+
+CREATE OR REPLACE FUNCTION test_function(a int) RETURNS SETOF oid AS
+$BODY$
+BEGIN
+	RETURN QUERY SELECT oid from pg_class where oid = a;
+END;
+$BODY$
+LANGUAGE plpgsql;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000002-0000000000000002-01'*/ select test_function(1);
+ test_function 
+---------------
+(0 rows)
+
+SELECT span_id AS top_span,
+		extract(epoch from span_start) as top_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as top_end
+		from pg_tracing_spans(false) where parent_id=2 and name!='Parse' \gset
+SELECT span_id AS top_run_span,
+		extract(epoch from span_start) as top_run_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as top_run_end
+		from pg_tracing_spans(false) where parent_id=:top_span and name='Executor' and resource='Run' \gset
+SELECT span_id AS top_project,
+		extract(epoch from span_start) as top_project_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as top_project_end
+		from pg_tracing_spans(false) where parent_id=:top_run_span and name='ProjectSet' \gset
+SELECT span_id AS top_result,
+		extract(epoch from span_start) as top_result_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as top_result_end
+		from pg_tracing_spans(false) where parent_id=:top_project and name='Result' \gset
+SELECT span_id AS nested_select,
+		extract(epoch from span_start) as select_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as select_end
+		from pg_tracing_spans(false) where parent_id=:top_result and name='Select' \gset
+SELECT span_id AS nested_run,
+		extract(epoch from span_start) as run_start,
+		round(extract(epoch from span_start) + duration / 1000000000.0) as run_end
+		from pg_tracing_spans(false) where parent_id=:nested_select and resource='Run' \gset
+SELECT :top_start < :top_run_start,
+		:top_end >= :top_run_end,
+		:top_run_start <= :top_project_start,
+		:top_run_end >= :top_project_end,
+		:top_run_end >= :select_end,
+		:top_run_end >= :run_end,
+		:run_end >= :select_end;
+ ?column? | ?column? | ?column? | ?column? | ?column? | ?column? | ?column? 
+----------+----------+----------+----------+----------+----------+----------
+ t        | t        | t        | t        | t        | t        | t
+(1 row)
+
+SELECT resource from pg_tracing_spans(false) where parent_id=:nested_run order by resource;
+                      resource                      
+----------------------------------------------------
+ IndexOnlyScan using pg_class_oid_index on pg_class
+(1 row)
+
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000003-0000000000000003-01'*/ SELECT * from current_database();
+   current_database    
+-----------------------
+ regression_pg_tracing
+(1 row)
+
+SELECT resource from pg_tracing_spans(false) where trace_id=3 order by resource;
+             resource              
+-----------------------------------
+ End
+ Finish
+ FunctionScan on current_database
+ Parse
+ Planner
+ Run
+ SELECT * from current_database();
+ Start
+(8 rows)
+
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000004-0000000000000004-01'*/ SELECT s.relation_size + s.index_size
+FROM (SELECT
+      pg_relation_size(C.oid) as relation_size,
+      pg_indexes_size(C.oid) as index_size
+    FROM pg_class C) as s limit 1;
+ ?column? 
+----------
+        0
+(1 row)
+
+SELECT resource from pg_tracing_spans(false) where trace_id=4 order by resource;
+                                                                             resource                                                                             
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ End
+ Finish
+ Limit
+ Parse
+ Planner
+ Run
+ SELECT s.relation_size + s.index_sizeFROM (SELECT pg_relation_size(C.oid) as relation_size, pg_indexes_size(C.oid) as index_size FROM pg_class C) as s limit $1;
+ SeqScan on pg_class c
+ Start
+ SubqueryScan on s
+(10 rows)
+
+-- Check tracking option
+set pg_tracing.track = 'top';
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000005-0000000000000005-01'*/ select test_function(1);
+ test_function 
+---------------
+(0 rows)
+
+SELECT count(*) from pg_tracing_spans where trace_id=5;
+ count 
+-------
+    10
+(1 row)
+
+set pg_tracing.track = 'none';
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000006-0000000000000006-01'*/ select test_function(1);
+ test_function 
+---------------
+(0 rows)
+
+SELECT count(*) from pg_tracing_spans where trace_id=6;
+ count 
+-------
+     0
+(1 row)
+
+set pg_tracing.track = 'all';
+-- Check that we're in a correct state after a timeout
+set statement_timeout=200;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000007-0000000000000007-01'*/ select * from pg_sleep(10);
+ERROR:  canceling statement due to statement timeout
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000008-0000000000000008-01'*/ select 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+SELECT trace_id, resource, sql_error_code from pg_tracing_spans order by span_start;
+ trace_id |          resource           | sql_error_code 
+----------+-----------------------------+----------------
+        7 | Parse                       | 00000
+        7 | select * from pg_sleep($1); | 57014
+        7 | Planner                     | 00000
+        7 | Start                       | 00000
+        7 | Run                         | 57014
+        7 | FunctionScan on pg_sleep    | 57014
+        8 | Parse                       | 00000
+        8 | select $1;                  | 00000
+        8 | Planner                     | 00000
+        8 | Start                       | 00000
+        8 | Run                         | 00000
+        8 | Result                      | 00000
+        8 | Finish                      | 00000
+        8 | End                         | 00000
+(14 rows)
+
+-- Test prepared statement
+PREPARE test_prepared (text, integer) AS /*$1*/ SELECT 1;
+EXECUTE test_prepared('dddbs=''postgres.db'',traceparent=''00-00000000000000000000000000000009-0000000000000009-01''', 1);
+ ?column? 
+----------
+        1
+(1 row)
+
+SELECT trace_id, resource from pg_tracing_spans order by span_start;
+ trace_id |                      resource                      
+----------+----------------------------------------------------
+        9 | PREPARE test_prepared (text, integer) AS SELECT 1;
+        9 | Planner
+        9 | Start
+        9 | Run
+        9 | Result
+        9 | Finish
+        9 | End
+(7 rows)
+
+-- Test prepared statement with generic plan
+SET plan_cache_mode='force_generic_plan';
+EXECUTE test_prepared('dddbs=''postgres.db'',traceparent=''00-00000000000000000000000000000010-0000000000000010-01''', 1);
+ ?column? 
+----------
+        1
+(1 row)
+
+SELECT trace_id, resource from pg_tracing_spans order by span_start;
+ trace_id |                      resource                      
+----------+----------------------------------------------------
+       16 | PREPARE test_prepared (text, integer) AS SELECT 1;
+       16 | Start
+       16 | Run
+       16 | Result
+       16 | Finish
+       16 | End
+(6 rows)
+
+DROP function test_function;
