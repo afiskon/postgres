@@ -31,8 +31,14 @@ typedef enum
 /* an individual tuple, stored in one chunk of memory */
 typedef struct ReorderBufferTupleBuf
 {
+	/* position in preallocated list */
+	slist_node	node;
+
 	/* tuple header, the interesting bit for users of logical decoding */
 	HeapTupleData tuple;
+
+	/* pre-allocated size of tuple buffer, different from tuple size */
+	Size		alloc_tuple_size;
 
 	/* actual tuple data follows */
 } ReorderBufferTupleBuf;
