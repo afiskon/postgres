@@ -562,7 +562,6 @@ ReorderBufferGetTupleBuf(ReorderBuffer *rb, Size tuple_len)
 		MemoryContextAlloc(rb->tup_context,
 						   sizeof(ReorderBufferTupleBuf) +
 						   MAXIMUM_ALIGNOF + alloc_len);
-	tuple->alloc_tuple_size = alloc_len;
 	tuple->tuple.t_data = ReorderBufferTupleBufData(tuple);
 
 	return tuple;
