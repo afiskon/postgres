@@ -37,10 +37,6 @@ typedef struct ReorderBufferTupleBuf
 	/* actual tuple data follows */
 } ReorderBufferTupleBuf;
 
-/* pointer to the data stored in a TupleBuf */
-#define ReorderBufferTupleBufData(p) \
-	((HeapTupleHeader) MAXALIGN(((char *) p) + sizeof(ReorderBufferTupleBuf)))
-
 /*
  * Types of the change passed to a 'change' callback.
  *
