@@ -2396,8 +2396,8 @@ calc_non_nestloop_required_outer(Path *outer_path, Path *inner_path)
 	Relids		inner_paramrels = PATH_REQ_OUTER(inner_path);
 	Relids		required_outer;
 
-	if(inner_path->parent->top_parent_relids)
-		elog(WARNING, "AALEKSEEV top_parent_relids = %p", inner_path->parent->top_parent_relids);
+	//if(inner_path->parent->top_parent_relids)
+	//	elog(WARNING, "AALEKSEEV top_parent_relids = %p", inner_path->parent->top_parent_relids);
 
 	/* neither path can require rels from the other */
 	Assert(!bms_overlap(outer_paramrels,
