@@ -3087,9 +3087,11 @@ cookDefault(ParseState *pstate,
 
 	if (attgenerated)
 	{
+		/* Disallow refs to other generated columns */
 		check_nested_generated(pstate, expr);
 
-		if (contain_mutable_functions(expr))
+		/* Disallow mutable functions */
+		if (ContainMutableFunctions((Expr *) expr))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 					 errmsg("generation expression is not immutable")));
