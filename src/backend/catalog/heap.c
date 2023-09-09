@@ -2365,7 +2365,7 @@ AddRelationNewConstraints(Relation rel,
 			continue;
 
 		/* If the DEFAULT is volatile we cannot use a missing value */
-		if (colDef->missingMode && contain_volatile_functions((Node *) expr))
+		if (colDef->missingMode && ContainVolatileFunctions((Expr *) expr))
 			colDef->missingMode = false;
 
 		defOid = StoreAttrDefault(rel, colDef->attnum, expr, is_internal,
