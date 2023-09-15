@@ -1,0 +1,215 @@
+-- Trace nothing
+SET pg_tracing.sample_rate = 0.0;
+SET pg_tracing.caller_sample_rate = 0.0;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000021-0000000000000021-01'*/ SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+select count(distinct(trace_id)) from pg_tracing_spans(false);
+ count 
+-------
+     0
+(1 row)
+
+select resource, parameters from pg_tracing_spans order by span_start, duration desc;
+ resource | parameters 
+----------+------------
+(0 rows)
+
+-- Trace everything
+SET pg_tracing.sample_rate = 1.0;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000022-0000000000000022-01'*/ SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000023-0000000000000023-00'*/ SELECT 2;
+ ?column? 
+----------
+        2
+(1 row)
+
+SELECT 3;
+ ?column? 
+----------
+        3
+(1 row)
+
+SELECT 4;
+ ?column? 
+----------
+        4
+(1 row)
+
+select count(distinct(trace_id)) from pg_tracing_spans(false);
+ count 
+-------
+     4
+(1 row)
+
+select resource, parameters from pg_tracing_spans(false) order by span_start, duration desc;
+  resource  | parameters 
+------------+------------
+ SELECT $1; | $1 = 1
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 2
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 3
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 4
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+(36 rows)
+
+-- Top spans should reuse generated ids
+select resource, parameters from pg_tracing_spans(false) where trace_id = parent_id and parent_id = span_id order by span_start, duration desc;
+  resource  | parameters 
+------------+------------
+ SELECT $1; | $1 = 3
+ SELECT $1; | $1 = 4
+(2 rows)
+
+select resource, parameters from pg_tracing_spans order by span_start, duration desc;
+  resource  | parameters 
+------------+------------
+ SELECT $1; | $1 = 1
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 2
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 3
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+ SELECT $1; | $1 = 4
+ Parse      | 
+ Post Parse | 
+ Planner    | 
+ Start      | 
+ Run        | 
+ Result     | 
+ Finish     | 
+ End        | 
+(36 rows)
+
+-- Cleanup
+SET plan_cache_mode='auto';
+SET pg_tracing.sample_rate = 0.0;
+-- Only trace query with sampled flag
+SET pg_tracing.caller_sample_rate = 1.0;
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000024-0000000000000024-01'*/ SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+/*dddbs='postgres.db',traceparent='00-00000000000000000000000000000025-0000000000000025-00'*/ SELECT 2;
+ ?column? 
+----------
+        2
+(1 row)
+
+SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+select count(distinct(trace_id)) from pg_tracing_spans(false);
+ count 
+-------
+     3
+(1 row)
+
+select resource, parameters from pg_tracing_spans(false) order by span_start, duration desc;
+             resource              | parameters 
+-----------------------------------+------------
+ SET plan_cache_mode='auto';       | 
+ Parse                             | 
+ Post Parse                        | 
+ SET plan_cache_mode='auto';       | 
+ SET pg_tracing.sample_rate = 0.0; | 
+ Parse                             | 
+ Post Parse                        | 
+ SET pg_tracing.sample_rate = 0.0; | 
+ SELECT $1;                        | $1 = 1
+ Parse                             | 
+ Post Parse                        | 
+ Planner                           | 
+ Start                             | 
+ Run                               | 
+ Result                            | 
+ Finish                            | 
+ End                               | 
+(17 rows)
+
+select resource, parameters from pg_tracing_spans order by span_start;
+             resource              | parameters 
+-----------------------------------+------------
+ SET plan_cache_mode='auto';       | 
+ Parse                             | 
+ Post Parse                        | 
+ SET plan_cache_mode='auto';       | 
+ SET pg_tracing.sample_rate = 0.0; | 
+ Parse                             | 
+ Post Parse                        | 
+ SET pg_tracing.sample_rate = 0.0; | 
+ SELECT $1;                        | $1 = 1
+ Parse                             | 
+ Post Parse                        | 
+ Planner                           | 
+ Start                             | 
+ Run                               | 
+ Result                            | 
+ Finish                            | 
+ End                               | 
+(17 rows)
+
