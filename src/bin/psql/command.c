@@ -1238,6 +1238,8 @@ exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
 			else
 				status = PSQL_CMD_NEWEDIT;
 		}
+		else
+			resetPQExpBuffer(query_buf);
 
 		free(obj_desc);
 	}
