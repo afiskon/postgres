@@ -211,6 +211,7 @@ main(int argc, char *argv[])
 					exit(1);
 				}
 
+				// FIXME: why 2?
 				if (set_oldest_commit_ts_xid < 2 &&
 					set_oldest_commit_ts_xid != 0)
 					pg_fatal("transaction ID (-c) must be either 0 or greater than or equal to 2");
