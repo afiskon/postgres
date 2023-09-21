@@ -648,7 +648,11 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		if (index_fetch_heap(scan, slot))
 		{
 			// AALEKSEEV DEBUG
-			if(scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC)
+
+			// xs_recheck: see the docs for amgettuple
+			// https://www.postgresql.org/docs/current/index-functions.html
+			// "False means it is certain that the index entry matches the scan keys"
+			if((!scan->xs_recheck) && (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
 			{
 				HeapTuple tup;
 				bool should_free;
@@ -660,6 +664,7 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 					!HeapTupleHeaderXminFrozen(tup->t_data))
 				{
 					// sven: but the tuple xmax is smaller than my xmin
+					// this fails when running meson test -C build --suite postgresql:isolation
 					Assert(tup->t_data->t_choice.t_heap.t_xmax >= scan->xs_snapshot->xmin);
 				}
 
