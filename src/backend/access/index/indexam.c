@@ -646,7 +646,19 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		 */
 		Assert(ItemPointerIsValid(&scan->xs_heaptid));
 		if (index_fetch_heap(scan, slot))
+		{
+			// AALEKSEEV DEBUG
+			HeapTuple tup;
+			bool should_free;
+
+			tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
+
+			Assert(tup.t_data.t_heap.t_xmin >= slot->xs_snapshot.xmin);
+
+			if(should_free) heap_freetuple(tup);
+
 			return true;
+		}
 	}
 
 	return false;
