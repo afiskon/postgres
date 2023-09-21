@@ -656,7 +656,8 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
 				if( TransactionIdIsNormal(tup->t_data->t_choice.t_heap.t_xmax) &&
-					TransactionIdIsNormal(scan->xs_snapshot->xmin) )
+					TransactionIdIsNormal(scan->xs_snapshot->xmin) &&
+					!HeapTupleHeaderXminFrozen(tup))
 				{
 					// sven: but the tuple xmax is smaller than my xmin
 					Assert(tup->t_data->t_choice.t_heap.t_xmax >= scan->xs_snapshot->xmin);
