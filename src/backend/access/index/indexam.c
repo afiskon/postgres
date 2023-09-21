@@ -655,7 +655,7 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 
 				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
-				Assert(tup->t_data.t_heap.t_xmin >= slot->xs_snapshot.xmin);
+				Assert(tup->t_data.t_heap.t_xmin >= scan->xs_snapshot.xmin);
 
 				if(should_free) heap_freetuple(tup);
 			}
