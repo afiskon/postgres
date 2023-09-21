@@ -648,7 +648,7 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		if (index_fetch_heap(scan, slot))
 		{
 			// AALEKSEEV DEBUG
-			if(slot->xs_snapshot.snapshot_type == SNAPSHOT_MVCC)
+			if(scan->xs_snapshot.snapshot_type == SNAPSHOT_MVCC)
 			{
 				HeapTuple tup;
 				bool should_free;
