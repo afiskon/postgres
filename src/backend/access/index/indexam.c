@@ -648,14 +648,17 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		if (index_fetch_heap(scan, slot))
 		{
 			// AALEKSEEV DEBUG
-			HeapTuple tup;
-			bool should_free;
+			if(slot->xs_snapshot.snapshot_type == SNAPSHOT_MVCC)
+			{
+				HeapTuple tup;
+				bool should_free;
 
-			tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
+				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
-			Assert(tup.t_data.t_heap.t_xmin >= slot->xs_snapshot.xmin);
+				Assert(tup->t_data.t_heap.t_xmin >= slot->xs_snapshot.xmin);
 
-			if(should_free) heap_freetuple(tup);
+				if(should_free) heap_freetuple(tup);
+			}
 
 			return true;
 		}
