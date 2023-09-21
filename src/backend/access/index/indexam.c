@@ -652,6 +652,9 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 			// xs_recheck: see the docs for amgettuple
 			// https://www.postgresql.org/docs/current/index-functions.html
 			// "False means it is certain that the index entry matches the scan keys"
+			// !!! Note that "success" means only that the index contains an entry that
+			//     matches the scan keys, not that the tuple necessarily still exists in
+			//     the heap or will pass the caller's snapshot test
 			if((!scan->xs_recheck) && (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
 			{
 				HeapTuple tup;
