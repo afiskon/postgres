@@ -656,7 +656,7 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 				//tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
 				Assert(DebugVisibilityWasChecked);
-				
+
 				//if(should_free) heap_freetuple(tup);
 			}
 
