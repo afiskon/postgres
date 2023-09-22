@@ -649,39 +649,15 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		DebugVisibilityWasChecked = false; // AALEKSEEV DEBUG
 		if (index_fetch_heap(scan, slot))
 		{
-			if((!scan->xs_recheck) && (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
+			if(/* (!scan->xs_recheck) && */ (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
 			{
-				HeapTuple tup;
-				bool should_free;
-				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
+				//HeapTuple tup;
+				//bool should_free;
+				//tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
 				Assert(DebugVisibilityWasChecked);
-
-/*
-				if( TransactionIdIsNormal(tup->t_data->t_choice.t_heap.t_xmax) &&
-					TransactionIdIsNormal(tup->t_data->t_choice.t_heap.t_xmin)
-					TransactionIdIsNormal(scan->xs_snapshot->xmin) &&
-					TransactionIdIsNormal(scan->xs_snapshot->xmax) &&
-					!HeapTupleHeaderXminFrozen(tup->t_data))
-				{
-					bool valid;
-					IndexFetchHeapData *hscan;
-
-					hscan = (IndexFetchHeapData *) scan;
-					LockBuffer(hscan->xs_cbuf, BUFFER_LOCK_SHARE);
-					valid = HeapTupleSatisfiesVisibility(tup, scan->xs_snapshot, hscan->xs_cbuf);
-					LockBuffer(hscan->xs_cbuf, BUFFER_LOCK_UNLOCK);
-
-					// Assert(valid);
-
-					// sven: but the tuple xmax is smaller than my xmin
-					// this fails when running meson test -C build --suite postgresql:isolation
-					// scan->xs_snapshot->xmin = lowest still-running XID, see the comments for GetSnapshotData()
-					// Assert(tup->t_data->t_choice.t_heap.t_xmax >= scan->xs_snapshot->xmin);
-				}
-				*/
 				
-				if(should_free) heap_freetuple(tup);
+				//if(should_free) heap_freetuple(tup);
 			}
 
 			return true;
