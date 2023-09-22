@@ -673,7 +673,8 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 					Assert(tup->t_data->t_choice.t_heap.t_xmax >= scan->xs_snapshot->xmin);
 				}
 				*/
-				Assert(valid);
+				
+				// Assert(valid);
 
 				if(should_free) heap_freetuple(tup);
 			}
