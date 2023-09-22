@@ -1441,6 +1441,9 @@ heap_fetch(Relation relation,
 	return false;
 }
 
+
+bool DebugVisibilityWasChecked; // AALEKSEEV DEBUG
+
 /*
  *	heap_hot_search_buffer	- search HOT chain for tuple satisfying snapshot
  *
@@ -1561,6 +1564,8 @@ heap_hot_search_buffer(ItemPointer tid, Relation relation, Buffer buffer,
 								 HeapTupleHeaderGetXmin(heapTuple->t_data));
 				if (all_dead)
 					*all_dead = false;
+
+				DebugVisibilityWasChecked = true;
 				return true;
 			}
 		}
