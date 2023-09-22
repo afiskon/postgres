@@ -648,28 +648,32 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		if (index_fetch_heap(scan, slot))
 		{
 			// AALEKSEEV DEBUG
-
-			// xs_recheck: see the docs for amgettuple
-			// https://www.postgresql.org/docs/current/index-functions.html
-			// "False means it is certain that the index entry matches the scan keys"
-			// !!! Note that "success" means only that the index contains an entry that
-			//     matches the scan keys, not that the tuple necessarily still exists in
-			//     the heap or will pass the caller's snapshot test
 			if((!scan->xs_recheck) && (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
 			{
+				IndexFetchHeapData *hscan;
 				HeapTuple tup;
 				bool should_free;
+				bool valid;
 
 				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 
+				hscan = (IndexFetchHeapData *) scan;
+				LockBuffer(hscan->xs_cbuf, BUFFER_LOCK_SHARE);
+				valid = HeapTupleSatisfiesVisibility(tup, scan->xs_snapshot, hscan->xs_cbuf);
+				LockBuffer(hscan->xs_cbuf, BUFFER_LOCK_UNLOCK);
+
+				/*
 				if( TransactionIdIsNormal(tup->t_data->t_choice.t_heap.t_xmax) &&
 					TransactionIdIsNormal(scan->xs_snapshot->xmin) &&
 					!HeapTupleHeaderXminFrozen(tup->t_data))
 				{
 					// sven: but the tuple xmax is smaller than my xmin
 					// this fails when running meson test -C build --suite postgresql:isolation
+					// scan->xs_snapshot->xmin = lowest still-running XID, see the comments for GetSnapshotData()
 					Assert(tup->t_data->t_choice.t_heap.t_xmax >= scan->xs_snapshot->xmin);
 				}
+				*/
+				Assert(valid);
 
 				if(should_free) heap_freetuple(tup);
 			}
