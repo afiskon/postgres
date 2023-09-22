@@ -646,16 +646,16 @@ index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *
 		 */
 		Assert(ItemPointerIsValid(&scan->xs_heaptid));
 
-
-		DebugVisibilityWasChecked = false;
+		DebugVisibilityWasChecked = false; // AALEKSEEV DEBUG
 		if (index_fetch_heap(scan, slot))
 		{
-			// AALEKSEEV DEBUG
 			if((!scan->xs_recheck) && (scan->xs_snapshot->snapshot_type == SNAPSHOT_MVCC))
 			{
 				HeapTuple tup;
 				bool should_free;
 				tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
+
+				Assert(DebugVisibilityWasChecked);
 
 /*
 				if( TransactionIdIsNormal(tup->t_data->t_choice.t_heap.t_xmax) &&
