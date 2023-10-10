@@ -2207,8 +2207,13 @@ has_multiple_baserels(PlannerInfo *root)
 		/* ignore RTEs that are "other rels" */
 		if (brel->reloptkind == RELOPT_BASEREL)
 			if (++num_base_rels > 1)
+			{
+				Assert(bms_membership(root->all_baserels) == BMS_MULTIPLE);
 				return true;
+			}
 	}
+
+	Assert(bms_membership(root->all_baserels) != BMS_MULTIPLE);
 	return false;
 }
 
