@@ -506,6 +506,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 CREATE EVENT TRIGGER on_login_trigger ON login EXECUTE PROCEDURE on_login_proc();
+
+-- AALEKSEEV DEBUG
+select pg_sleep(5);
+
 ALTER EVENT TRIGGER on_login_trigger ENABLE ALWAYS;
 \c
 SELECT COUNT(*) FROM user_logins;

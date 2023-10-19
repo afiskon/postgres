@@ -1,3 +1,7 @@
+-- AALEKSEEV DEBUG
+select pg_sleep(2);
+\c
+
 --
 -- Verify system catalog foreign key relationships
 --
