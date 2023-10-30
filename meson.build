@@ -3248,10 +3248,6 @@ foreach test_dir : tests
 
       testport += 1
     elif kind == 'tap'
-      if not tap_tests_enabled
-        continue
-      endif
-
       test_command = [
         perl.path(),
         '-I', meson.source_root() / 'src/test/perl',
@@ -3286,16 +3282,23 @@ foreach test_dir : tests
           onetap_p = fs.stem(onetap_p)
         endif
 
-        test(test_dir['name'] / onetap_p,
-          python,
-          kwargs: test_kwargs,
-          args: testwrap_base + [
-            '--testgroup', test_dir['name'],
-            '--testname', onetap_p,
-            '--', test_command,
-            test_dir['sd'] / onetap,
-          ],
-        )
+        if tap_tests_enabled
+          test(test_dir['name'] / onetap_p,
+            python,
+            kwargs: test_kwargs,
+            args: testwrap_base + [
+              '--testgroup', test_dir['name'],
+              '--testname', onetap_p,
+              '--', test_command,
+              test_dir['sd'] / onetap,
+            ],
+          )
+        else
+          test(test_dir['name'] / onetap_p,
+               perl,
+               args: ['-e', 'print "1..0 # Skipped: TAP tests not enabled"'],
+               kwargs: test_kwargs)
+        endif
       endforeach
       install_suites += test_group
     else
