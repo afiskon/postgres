@@ -5255,7 +5255,9 @@ get_explain_guc_options(int *num)
 				{
 					struct config_string *lconf = (struct config_string *) conf;
 
-					modified = (strcmp(lconf->boot_val, *(lconf->variable)) != 0);
+					modified = (lconf->boot_val == NULL ||
+								*lconf->variable == NULL ||
+								strcmp(lconf->boot_val, *(lconf->variable)) != 0);
 				}
 				break;
 
