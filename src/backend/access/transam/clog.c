@@ -64,7 +64,7 @@
 
 
 /*
- * Although we return an int64 the actual value can't currently exceeed 2**32.
+ * Although we return an int64 the actual value can't currently exceed 2**32.
  */
 static inline int64
 TransactionIdToPage(TransactionId xid)
