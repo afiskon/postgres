@@ -469,6 +469,32 @@ insert into domcontest values (42);
 alter domain con drop constraint nonexistent;
 alter domain con drop constraint if exists nonexistent;
 
+-- not-null constraints
+create domain connotnull integer;
+create table domconnotnulltest
+( col1 connotnull
+, col2 connotnull
+);
+
+insert into domconnotnulltest default values;
+alter domain connotnull add not null value; -- fails
+
+update domconnotnulltest set col1 = 5;
+alter domain connotnull add not null value; -- fails
+
+update domconnotnulltest set col2 = 6;
+
+alter domain connotnull add constraint constr1 not null value;
+
+update domconnotnulltest set col1 = null; -- fails
+
+alter domain connotnull drop constraint constr1;
+
+update domconnotnulltest set col1 = null;
+
+drop domain connotnull cascade;
+drop table domconnotnulltest;
+
 -- Test ALTER DOMAIN .. CONSTRAINT .. NOT VALID
 create domain things AS INT;
 CREATE TABLE thethings (stuff things);
