@@ -742,7 +742,7 @@ CreateSubscription(ParseState *pstate, CreateSubscriptionStmt *stmt,
 		if (!wrconn)
 			ereport(ERROR,
 					(errcode(ERRCODE_CONNECTION_FAILURE),
-					 errmsg("could not connect to the publisher: %s", err)));
+					 errmsg("subscription \"%s\" could not connect to the publisher: %s", stmt->subname, err)));
 
 		PG_TRY();
 		{
@@ -875,7 +875,7 @@ AlterSubscription_refresh(Subscription *sub, bool copy_data,
 	if (!wrconn)
 		ereport(ERROR,
 				(errcode(ERRCODE_CONNECTION_FAILURE),
-				 errmsg("could not connect to the publisher: %s", err)));
+				 errmsg("subscription \"%s\" could not connect to the publisher: %s", sub->name, err)));
 
 	PG_TRY();
 	{
