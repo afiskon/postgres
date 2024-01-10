@@ -304,7 +304,7 @@ pg_stat_get_progress_info(PG_FUNCTION_ARGS)
 Datum
 pg_stat_get_activity(PG_FUNCTION_ARGS)
 {
-#define PG_STAT_GET_ACTIVITY_COLS	31
+#define PG_STAT_GET_ACTIVITY_COLS	32
 	int			num_backends = pgstat_fetch_stat_numbackends();
 	int			curr_backend;
 	int			pid = PG_ARGISNULL(0) ? -1 : PG_GETARG_INT32(0);
@@ -617,6 +617,9 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 				nulls[30] = true;
 			else
 				values[30] = UInt64GetDatum(beentry->st_query_id);
+
+			/* Authenticated user */
+			values[31] = CStringGetTextDatum(beentry->st_authuser);
 		}
 		else
 		{
@@ -646,6 +649,7 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 			nulls[28] = true;
 			nulls[29] = true;
 			nulls[30] = true;
+			nulls[31] = true;
 		}
 
 		tuplestore_putvalues(rsinfo->setResult, rsinfo->setDesc, values, nulls);

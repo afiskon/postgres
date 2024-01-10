@@ -357,6 +357,11 @@ pgstat_bestart(void)
 	else
 		MemSet(&lbeentry.st_clientaddr, 0, sizeof(lbeentry.st_clientaddr));
 
+	if (MyProcPort && GetSystemUser())
+		strlcpy(lbeentry.st_authuser, GetSystemUser(), NAMEDATALEN);
+	else
+		MemSet(&lbeentry.st_authuser, 0, sizeof(lbeentry.st_authuser));
+
 #ifdef USE_SSL
 	if (MyProcPort && MyProcPort->ssl_in_use)
 	{

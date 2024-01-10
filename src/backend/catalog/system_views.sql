@@ -873,6 +873,7 @@ CREATE VIEW pg_stat_activity AS
             S.leader_pid,
             S.usesysid,
             U.rolname AS usename,
+            S.authname,
             S.application_name,
             S.client_addr,
             S.client_hostname,
