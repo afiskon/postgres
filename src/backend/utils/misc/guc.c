@@ -1822,7 +1822,7 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 	else
 	{
 		write_stderr("%s does not know where to find the server configuration file.\n"
-					 "You must specify the --config-file or -D invocation "
+					 "You must specify the -D invocation "
 					 "option or set the PGDATA environment variable.\n",
 					 progname);
 		return false;
