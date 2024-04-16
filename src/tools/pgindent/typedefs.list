@@ -218,6 +218,7 @@ BTScanPos
 BTScanPosData
 BTScanPosItem
 BTShared
+BTSkipPreproc
 BTSortArrayContext
 BTSpool
 BTStack
@@ -2651,6 +2652,8 @@ SingleBoundSortItem
 SinglePartitionSpec
 Size
 SkipPages
+SkipSupport
+SkipSupportData
 SlabBlock
 SlabContext
 SlabSlot
