@@ -161,7 +161,6 @@ typedef enum
  */
 struct PGPROC
 {
-	dlist_node	links;			/* list link if process is in a list */
 	dlist_head *procgloballist; /* procglobal list that owns this PGPROC */
 
 	PGSemaphore sem;			/* ONE semaphore to sleep on */
@@ -174,6 +173,8 @@ struct PGPROC
 								 * executed by this proc, if running and XID
 								 * is assigned; else InvalidTransactionId.
 								 * mirrored in ProcGlobal->xids[pgxactoff] */
+	
+	dlist_node	links;			/* list link if process is in a list */
 
 	TransactionId xmin;			/* minimal running XID as it was when we were
 								 * starting our xact, excluding LAZY VACUUM:
