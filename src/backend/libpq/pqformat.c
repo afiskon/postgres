@@ -31,6 +31,8 @@
 /*
  * INTERFACE ROUTINES
  * Message assembly and output:
+ *		pq_puttextmessage - generate a character set-converted message in one step
+ *		pq_putemptymessage - convenience routine for message with empty body
  *		pq_beginmessage - initialize StringInfo buffer
  *		pq_sendbyte		- append a raw byte to a StringInfo buffer
  *		pq_sendint		- append a binary integer to a StringInfo buffer
@@ -50,10 +52,6 @@
  * typsend support (construct a bytea value containing external binary data):
  *		pq_begintypsend - initialize StringInfo buffer
  *		pq_endtypsend	- return the completed string as a "bytea*"
- *
- * Special-case message output:
- *		pq_puttextmessage - generate a character set-converted message in one step
- *		pq_putemptymessage - convenience routine for message with empty body
  *
  * Message parsing after input:
  *		pq_getmsgbyte	- get a raw byte from a message buffer
@@ -79,6 +77,40 @@
 #include "port/pg_bswap.h"
 #include "varatt.h"
 
+/* --------------------------------
+ *		pq_puttextmessage - generate a character set-converted message in one step
+ *
+ *		This is the same as the pqcomm.c routine pq_putmessage, except that
+ *		the message body is a null-terminated string to which encoding
+ *		conversion applies.
+ * --------------------------------
+ */
+void
+pq_puttextmessage(PqMsg msgtype, const char *str)
+{
+	int			slen = strlen(str);
+	char	   *p;
+
+	p = pg_server_to_client(str, slen);
+	if (p != str)				/* actual conversion has been done? */
+	{
+		(void) pq_putmessage(msgtype, p, strlen(p) + 1);
+		pfree(p);
+		return;
+	}
+	(void) pq_putmessage(msgtype, str, slen + 1);
+}
+
+
+/* --------------------------------
+ *		pq_putemptymessage - convenience routine for message with empty body
+ * --------------------------------
+ */
+void
+pq_putemptymessage(PqMsg msgtype)
+{
+	(void) pq_putmessage(msgtype, NULL, 0);
+}
 
 /* --------------------------------
  *		pq_beginmessage		- initialize for sending a message
@@ -352,42 +384,6 @@ pq_endtypsend(StringInfo buf)
 	SET_VARSIZE(result, buf->len);
 
 	return result;
-}
-
-
-/* --------------------------------
- *		pq_puttextmessage - generate a character set-converted message in one step
- *
- *		This is the same as the pqcomm.c routine pq_putmessage, except that
- *		the message body is a null-terminated string to which encoding
- *		conversion applies.
- * --------------------------------
- */
-void
-pq_puttextmessage(PqMsg msgtype, const char *str)
-{
-	int			slen = strlen(str);
-	char	   *p;
-
-	p = pg_server_to_client(str, slen);
-	if (p != str)				/* actual conversion has been done? */
-	{
-		(void) pq_putmessage(msgtype, p, strlen(p) + 1);
-		pfree(p);
-		return;
-	}
-	(void) pq_putmessage(msgtype, str, slen + 1);
-}
-
-
-/* --------------------------------
- *		pq_putemptymessage - convenience routine for message with empty body
- * --------------------------------
- */
-void
-pq_putemptymessage(PqMsg msgtype)
-{
-	(void) pq_putmessage(msgtype, NULL, 0);
 }
 
 
