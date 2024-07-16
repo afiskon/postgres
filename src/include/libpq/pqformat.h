@@ -13,12 +13,13 @@
 #ifndef PQFORMAT_H
 #define PQFORMAT_H
 
+#include "protocol.h"
 #include "lib/stringinfo.h"
 #include "mb/pg_wchar.h"
 #include "port/pg_bswap.h"
 
-extern void pq_beginmessage(StringInfo buf, char msgtype);
-extern void pq_beginmessage_reuse(StringInfo buf, char msgtype);
+extern void pq_beginmessage(StringInfo buf, PqMsg msgtype);
+extern void pq_beginmessage_reuse(StringInfo buf, PqMsg msgtype);
 extern void pq_endmessage(StringInfo buf);
 extern void pq_endmessage_reuse(StringInfo buf);
 
@@ -191,8 +192,8 @@ pq_sendint(StringInfo buf, uint32 i, int b)
 extern void pq_begintypsend(StringInfo buf);
 extern bytea *pq_endtypsend(StringInfo buf);
 
-extern void pq_puttextmessage(char msgtype, const char *str);
-extern void pq_putemptymessage(char msgtype);
+extern void pq_puttextmessage(PqMsg msgtype, const char *str);
+extern void pq_putemptymessage(PqMsg msgtype);
 
 extern int	pq_getmsgbyte(StringInfo msg);
 extern unsigned int pq_getmsgint(StringInfo msg, int b);

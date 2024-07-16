@@ -21,7 +21,6 @@
 #include "foreign/fdwapi.h"
 #include "jit/jit.h"
 #include "libpq/pqformat.h"
-#include "libpq/protocol.h"
 #include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"

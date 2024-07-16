@@ -14,57 +14,58 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-/* These are the request codes sent by the frontend. */
+typedef enum PqMsg
+{
+	/* These are the request codes sent by the frontend. */
 
-#define PqMsg_Bind					'B'
-#define PqMsg_Close					'C'
-#define PqMsg_Describe				'D'
-#define PqMsg_Execute				'E'
-#define PqMsg_FunctionCall			'F'
-#define PqMsg_Flush					'H'
-#define PqMsg_Parse					'P'
-#define PqMsg_Query					'Q'
-#define PqMsg_Sync					'S'
-#define PqMsg_Terminate				'X'
-#define PqMsg_CopyFail				'f'
-#define PqMsg_GSSResponse			'p'
-#define PqMsg_PasswordMessage		'p'
-#define PqMsg_SASLInitialResponse	'p'
-#define PqMsg_SASLResponse			'p'
+	PqMsg_Bind = 'B',
+	PqMsg_Close = 'C',
+	PqMsg_Describe = 'D',
+	PqMsg_Execute = 'E',
+	PqMsg_FunctionCall = 'F',
+	PqMsg_Flush = 'H',
+	PqMsg_Parse = 'P',
+	PqMsg_Query = 'Q',
+	PqMsg_Sync = 'S',
+	PqMsg_Terminate = 'X',
+	PqMsg_CopyFail = 'f',
+	PqMsg_GSSResponse = 'p',
+	PqMsg_PasswordMessage = 'p',
+	PqMsg_SASLInitialResponse = 'p',
+	PqMsg_SASLResponse = 'p',
 
+	/* These are the response codes sent by the backend. */
 
-/* These are the response codes sent by the backend. */
+	PqMsg_ParseComplete = '1',
+	PqMsg_BindComplete = '2',
+	PqMsg_CloseComplete = '3',
+	PqMsg_NotificationResponse = 'A',
+	PqMsg_CommandComplete = 'C',
+	PqMsg_DataRow = 'D',
+	PqMsg_ErrorResponse = 'E',
+	PqMsg_CopyInResponse = 'G',
+	PqMsg_CopyOutResponse = 'H',
+	PqMsg_EmptyQueryResponse = 'I',
+	PqMsg_BackendKeyData = 'K',
+	PqMsg_NoticeResponse = 'N',
+	PqMsg_Progress = 'P',
+	PqMsg_AuthenticationRequest = 'R',
+	PqMsg_ParameterStatus = 'S',
+	PqMsg_RowDescription = 'T',
+	PqMsg_FunctionCallResponse = 'V',
+	PqMsg_CopyBothResponse = 'W',
+	PqMsg_ReadyForQuery = 'Z',
+	PqMsg_NoData = 'n',
+	PqMsg_PortalSuspended = 's',
+	PqMsg_ParameterDescription = 't',
+	PqMsg_NegotiateProtocolVersion = 'v',
 
-#define PqMsg_ParseComplete			'1'
-#define PqMsg_BindComplete			'2'
-#define PqMsg_CloseComplete			'3'
-#define PqMsg_NotificationResponse	'A'
-#define PqMsg_CommandComplete		'C'
-#define PqMsg_DataRow				'D'
-#define PqMsg_ErrorResponse			'E'
-#define PqMsg_CopyInResponse		'G'
-#define PqMsg_CopyOutResponse		'H'
-#define PqMsg_EmptyQueryResponse	'I'
-#define PqMsg_BackendKeyData		'K'
-#define PqMsg_NoticeResponse		'N'
-#define PqMsg_Progress              'P'
-#define PqMsg_AuthenticationRequest 'R'
-#define PqMsg_ParameterStatus		'S'
-#define PqMsg_RowDescription		'T'
-#define PqMsg_FunctionCallResponse	'V'
-#define PqMsg_CopyBothResponse		'W'
-#define PqMsg_ReadyForQuery			'Z'
-#define PqMsg_NoData				'n'
-#define PqMsg_PortalSuspended		's'
-#define PqMsg_ParameterDescription	't'
-#define PqMsg_NegotiateProtocolVersion 'v'
+	/* These are the codes sent by both the frontend and backend. */
 
+	PqMsg_CopyDone = 'c',
+	PqMsg_CopyData = 'd',
 
-/* These are the codes sent by both the frontend and backend. */
-
-#define PqMsg_CopyDone				'c'
-#define PqMsg_CopyData				'd'
-
+}			PqMsg;
 
 /* These are the authentication request codes sent by the backend. */
 

@@ -85,7 +85,7 @@
  * --------------------------------
  */
 void
-pq_beginmessage(StringInfo buf, char msgtype)
+pq_beginmessage(StringInfo buf, PqMsg msgtype)
 {
 	initStringInfo(buf);
 
@@ -106,7 +106,7 @@ pq_beginmessage(StringInfo buf, char msgtype)
  * --------------------------------
  */
 void
-pq_beginmessage_reuse(StringInfo buf, char msgtype)
+pq_beginmessage_reuse(StringInfo buf, PqMsg msgtype)
 {
 	resetStringInfo(buf);
 
@@ -364,7 +364,7 @@ pq_endtypsend(StringInfo buf)
  * --------------------------------
  */
 void
-pq_puttextmessage(char msgtype, const char *str)
+pq_puttextmessage(PqMsg msgtype, const char *str)
 {
 	int			slen = strlen(str);
 	char	   *p;
@@ -385,7 +385,7 @@ pq_puttextmessage(char msgtype, const char *str)
  * --------------------------------
  */
 void
-pq_putemptymessage(char msgtype)
+pq_putemptymessage(PqMsg msgtype)
 {
 	(void) pq_putmessage(msgtype, NULL, 0);
 }

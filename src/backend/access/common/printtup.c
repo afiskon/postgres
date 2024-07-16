@@ -17,7 +17,6 @@
 
 #include "access/printtup.h"
 #include "libpq/pqformat.h"
-#include "libpq/protocol.h"
 #include "tcop/pquery.h"
 #include "utils/lsyscache.h"
 #include "utils/memdebug.h"
