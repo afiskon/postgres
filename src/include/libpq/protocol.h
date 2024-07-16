@@ -47,6 +47,7 @@
 #define PqMsg_EmptyQueryResponse	'I'
 #define PqMsg_BackendKeyData		'K'
 #define PqMsg_NoticeResponse		'N'
+#define PqMsg_Progress              'P'
 #define PqMsg_AuthenticationRequest 'R'
 #define PqMsg_ParameterStatus		'S'
 #define PqMsg_RowDescription		'T'
