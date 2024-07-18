@@ -2256,6 +2256,33 @@ SELECT sha512('The quick brown fox jumps over the lazy dog.');
 (1 row)
 
 --
+-- CRC32
+--
+SELECT crc32(''::bytea);
+  crc32   
+----------
+ 00000000
+(1 row)
+
+SELECT crc32('The quick brown fox jumps over the lazy dog.'::bytea);
+  crc32   
+----------
+ 519025e9
+(1 row)
+
+SELECT crc32c(''::bytea);
+  crc32c  
+----------
+ 00000000
+(1 row)
+
+SELECT crc32c('The quick brown fox jumps over the lazy dog.'::bytea);
+  crc32c  
+----------
+ 190097b3
+(1 row)
+
+--
 -- encode/decode
 --
 SELECT encode('\x1234567890abcdef00', 'hex');

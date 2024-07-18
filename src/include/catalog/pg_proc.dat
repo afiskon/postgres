@@ -7743,6 +7743,14 @@
   proname => 'system', provolatile => 'v', prorettype => 'tsm_handler',
   proargtypes => 'internal', prosrc => 'tsm_system_handler' },
 
+# non-cryptographic
+{ oid => '8571', descr => 'CRC32 value',
+  proname => 'crc32', proleakproof => 't', prorettype => 'text',
+  proargtypes => 'bytea', prosrc => 'crc32_bytea' },
+{ oid => '8572', descr => 'CRC32C value',
+  proname => 'crc32c', proleakproof => 't', prorettype => 'text',
+  proargtypes => 'bytea', prosrc => 'crc32c_bytea' },
+
 # cryptographic
 { oid => '2311', descr => 'MD5 hash',
   proname => 'md5', proleakproof => 't', prorettype => 'text',
