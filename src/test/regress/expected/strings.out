@@ -2690,3 +2690,123 @@ ERROR:  invalid Unicode code point: 2FFFFF
 SELECT unistr('wrong: \xyz');
 ERROR:  invalid Unicode escape
 HINT:  Unicode escapes must be \XXXX, \+XXXXXX, \uXXXX, or \UXXXXXXXX.
+--
+-- Test coercions between bytea and integer types
+--
+SET bytea_output TO hex;
+SELECT 0x1234::int2::bytea;
+ bytea  
+--------
+ \x1234
+(1 row)
+
+SELECT 0x12345678::int4::bytea;
+   bytea    
+------------
+ \x12345678
+(1 row)
+
+SELECT 0x1122334455667788::int8::bytea;
+       bytea        
+--------------------
+ \x1122334455667788
+(1 row)
+
+SELECT ''::bytea::int2 = 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x12'::bytea::int2 = 0x12;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x1234'::bytea::int2 = 0x1234;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x123456'::bytea::int2; -- error
+ERROR:  smallint out of range
+SELECT ''::bytea::int4 = 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x12'::bytea::int4 = 0x12;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x12345678'::bytea::int4 = 0x12345678;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x123456789A'::bytea::int4; -- error
+ERROR:  integer out of range
+SELECT ''::bytea::int8 = 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x12'::bytea::int8 = 0x12;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x1122334455667788'::bytea::int8 = 0x1122334455667788;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x112233445566778899'::bytea::int8; -- error
+ERROR:  bigint out of range
+-- max integer values
+SELECT '\x7FFF'::bytea::int2 = 0x7FFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x7FFFFFFF'::bytea::int4 = 0x7FFFFFFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x7FFFFFFFFFFFFFFF'::bytea::int8 = 0x7FFFFFFFFFFFFFFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+-- min integer values
+SELECT '\x8000'::bytea::int2 = -0x8000;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x80000000'::bytea::int4 = -0x80000000;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x8000000000000000'::bytea::int8 = -0x8000000000000000;
+ ?column? 
+----------
+ t
+(1 row)
+
