@@ -821,7 +821,7 @@ static void
 check_slru_segment_filenames(void)
 {
 	int i;
-	static const char* dirs = {
+	static const char* dirs[] = {
 		"pg_xact",
 		"pg_commit_ts",
 		"pg_multixacts/offsets",
@@ -837,7 +837,7 @@ check_slru_segment_filenames(void)
 	*/
 
 	for(i = 0; i < sizeof(dirs)/sizeof(dirs[0]); i++)
-		rename_slru_segments(dir);
+		rename_slru_segments(dirs[i]);
 }
 
 
