@@ -38,6 +38,7 @@
 
 #include "postgres_fe.h"
 
+#include <dirent.h>
 #include <time.h>
 
 #include "catalog/pg_class_d.h"
@@ -60,7 +61,7 @@ static void prepare_new_globals(void);
 static void create_new_objects(void);
 static void copy_xact_xlog_xid(void);
 static void check_slru_segment_filenames(void);
-static void rename_slru_segments(const char *dir);
+static void rename_slru_segments(const char *dirname);
 static void set_frozenxids(bool minmxid_only);
 static void make_outputdirs(char *pgdata);
 static void setup(char *argv0);
@@ -810,11 +811,32 @@ copy_xact_xlog_xid(void)
 }
 
 static void
-rename_slru_segments(const char* dir)
+rename_slru_segments(const char* dirname)
 {
-	prep_status("Renaming SLRU segments in %s", dir);
+	DIR		   *dir;
+	struct dirent *de;
+	char		full_path[MAXPGPATH];
 
-	// TODO FIXME use readdir() - see pg_resetwal.c - and copyFile()
+	prep_status("Renaming SLRU segments in %s", dirname);
+	snprintf(full_path, sizeof(full_path), "%s/%s", new_cluster.pgdata, dirname);
+
+	dir = opendir(full_path);
+	if (dir == NULL)
+		pg_fatal("could not open directory \"%s\": %m", full_path);
+
+
+	while (errno = 0, (de = readdir(dir)) != NULL)
+	{
+		prep_status("de->d_name = %s\n", de->d_name);
+
+		// AALEKSEEV TODO FIXME
+	}
+
+	if (errno)
+		pg_fatal("could not read directory \"%s\": %m", full_path);
+
+	if (closedir(dir))
+		pg_fatal("could not close directory \"%s\": %m", full_path);
 }
 
 static void
