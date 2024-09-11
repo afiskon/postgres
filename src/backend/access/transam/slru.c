@@ -1725,18 +1725,6 @@ SlruScanDirCbDeleteAll(SlruCtl ctl, char *filename, int64 segpage, void *data)
 }
 
 /*
- * An internal function used by SlruScanDirectory().
- *
- * Returns true if a file with a name of a given length may be a correct
- * SLRU segment.
- */
-static inline bool
-SlruCorrectSegmentFilenameLength(SlruCtl ctl, size_t len)
-{
-	return (len == 15);		/* see SlruFileName() */
-}
-
-/*
  * Scan the SimpleLru directory and apply a callback to each file found in it.
  *
  * If the callback returns true, the scan is stopped.  The last return value
@@ -1767,7 +1755,7 @@ SlruScanDirectory(SlruCtl ctl, SlruScanCallback callback, void *data)
 
 		len = strlen(clde->d_name);
 
-		if (SlruCorrectSegmentFilenameLength(ctl, len) &&
+		if ((len == 15) &&
 			strspn(clde->d_name, "0123456789ABCDEF") == len)
 		{
 			segno = strtoi64(clde->d_name, NULL, 16);
