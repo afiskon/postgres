@@ -847,9 +847,9 @@ rename_slru_segments(const char* dirname)
 					(long long) segno);
 		snprintf(old_path, MAXPGPATH, "%s/%s", dir_path, de->d_name);
 
-		prep_status("%s -> %s\n", old_path, new_path);
-
-		// AALEKSEEV TODO FIXME: MOVE the file (don't COPY)
+		if (pg_mv_file(old_path, new_path) != 0)
+			pg_fatal("could not rename file \"%s\" to \"%s\": %m",
+					 old_path, new_path);
 	}
 
 	if (errno)
