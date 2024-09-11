@@ -59,6 +59,8 @@ static void prepare_new_cluster(void);
 static void prepare_new_globals(void);
 static void create_new_objects(void);
 static void copy_xact_xlog_xid(void);
+static void check_slru_segment_filenames(void);
+static void rename_slru_segments(const char *dir);
 static void set_frozenxids(bool minmxid_only);
 static void make_outputdirs(char *pgdata);
 static void setup(char *argv0);
@@ -154,6 +156,7 @@ main(int argc, char **argv)
 	 */
 
 	copy_xact_xlog_xid();
+	check_slru_segment_filenames();
 
 	/* New now using xids of the old system */
 
@@ -804,6 +807,37 @@ copy_xact_xlog_xid(void)
 			  old_cluster.controldata.nextxlogfile + 8,
 			  new_cluster.pgdata);
 	check_ok();
+}
+
+static void
+rename_slru_segments(const char* dir)
+{
+	prep_status("Renaming SLRU segments in %s", dir);
+
+	// TODO FIXME use readdir() - see pg_resetwal.c - and copyFile()
+}
+
+static void
+check_slru_segment_filenames(void)
+{
+	int i;
+	static const char* dirs = {
+		"pg_xact",
+		"pg_commit_ts",
+		"pg_multixacts/offsets",
+		"pg_miltixacts/members",
+		"pg_subtrans",
+		"pg_serial",
+	};
+
+	/*
+	TODO FIXME UNCOMMENT BEFORE COMMITTING
+	if(new_cluster.controldata.cat_ver < SLRU_SEG_FILENAMES_CHANGE_CAT_VER)
+		return;
+	*/
+
+	for(i = 0; i < sizeof(dirs)/sizeof(dirs[0]); i++)
+		rename_slru_segments(dir);
 }
 
 
