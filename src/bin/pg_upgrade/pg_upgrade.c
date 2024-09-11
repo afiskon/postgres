@@ -815,6 +815,7 @@ rename_slru_segments(const char* dirname)
 {
 	DIR		   *dir;
 	struct dirent *de;
+	int 		len;
 	char		full_path[MAXPGPATH];
 
 	prep_status("Renaming SLRU segments in %s", dirname);
@@ -827,6 +828,18 @@ rename_slru_segments(const char* dirname)
 
 	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
+		/*
+		 * ignore '.', '..' and everything else that doesn't look
+		 * like an SLRU segment with a short file name
+		 */
+
+		len = strlen(de->d_name);
+		if(len != 4 && len != 5 && len != 6)
+			continue;
+
+		if(strspn(de->d_name, "0123456789ABCDEF") != len)
+			continue;
+
 		prep_status("de->d_name = %s\n", de->d_name);
 
 		// AALEKSEEV TODO FIXME
@@ -846,7 +859,7 @@ check_slru_segment_filenames(void)
 	static const char* dirs[] = {
 		"pg_xact",
 		"pg_commit_ts",
-		"pg_multixacts/offsets",
+		// "pg_multixacts/offsets", // TODO FIXME no such file or directory
 		"pg_miltixacts/members",
 		"pg_subtrans",
 		"pg_serial",
