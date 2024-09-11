@@ -859,8 +859,8 @@ check_slru_segment_filenames(void)
 	static const char* dirs[] = {
 		"pg_xact",
 		"pg_commit_ts",
-		// "pg_multixacts/offsets", // TODO FIXME no such file or directory
-		"pg_miltixacts/members",
+		"pg_multixact/offsets",
+		"pg_multixact/members",
 		"pg_subtrans",
 		"pg_serial",
 	};
