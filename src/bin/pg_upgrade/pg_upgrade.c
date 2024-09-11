@@ -816,15 +816,17 @@ rename_slru_segments(const char* dirname)
 	DIR		   *dir;
 	struct dirent *de;
 	int 		len;
-	char		full_path[MAXPGPATH];
+	int64 		segno;
+	char		dir_path[MAXPGPATH];
+	char		old_path[MAXPGPATH];
+	char		new_path[MAXPGPATH];
 
 	prep_status("Renaming SLRU segments in %s", dirname);
-	snprintf(full_path, sizeof(full_path), "%s/%s", new_cluster.pgdata, dirname);
+	snprintf(dir_path, sizeof(dir_path), "%s/%s", new_cluster.pgdata, dirname);
 
-	dir = opendir(full_path);
+	dir = opendir(dir_path);
 	if (dir == NULL)
-		pg_fatal("could not open directory \"%s\": %m", full_path);
-
+		pg_fatal("could not open directory \"%s\": %m", dir_path);
 
 	while (errno = 0, (de = readdir(dir)) != NULL)
 	{
@@ -840,16 +842,23 @@ rename_slru_segments(const char* dirname)
 		if(strspn(de->d_name, "0123456789ABCDEF") != len)
 			continue;
 
-		prep_status("de->d_name = %s\n", de->d_name);
+		segno = strtoi64(de->d_name, NULL, 16);
+		snprintf(new_path, MAXPGPATH, "%s/%015llX", dir_path,
+					(long long) segno);
+		snprintf(old_path, MAXPGPATH, "%s/%s", dir_path, de->d_name);
 
-		// AALEKSEEV TODO FIXME
+		prep_status("%s -> %s\n", old_path, new_path);
+
+		// AALEKSEEV TODO FIXME: MOVE the file (don't COPY)
 	}
 
 	if (errno)
-		pg_fatal("could not read directory \"%s\": %m", full_path);
+		pg_fatal("could not read directory \"%s\": %m", dir_path);
 
 	if (closedir(dir))
-		pg_fatal("could not close directory \"%s\": %m", full_path);
+		pg_fatal("could not close directory \"%s\": %m", dir_path);
+
+	check_ok();
 }
 
 static void
@@ -871,7 +880,7 @@ check_slru_segment_filenames(void)
 		return;
 	*/
 
-	for(i = 0; i < sizeof(dirs)/sizeof(dirs[0]); i++)
+	for (i = 0; i < sizeof(dirs)/sizeof(dirs[0]); i++)
 		rename_slru_segments(dirs[i]);
 }
 
