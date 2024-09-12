@@ -5446,7 +5446,7 @@ DefineCustomInt64Variable(const char *name,
 						GucInt64AssignHook assign_hook,
 						GucShowHook show_hook)
 {
-	struct config_int *var;
+	struct config_int64 *var;
 
 	var = (struct config_int64 *)
 		init_custom_variable(name, short_desc, long_desc, context, flags,
