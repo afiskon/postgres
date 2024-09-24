@@ -224,33 +224,6 @@ static relopt_int intRelOpts[] =
 	},
 	{
 		{
-			"autovacuum_vacuum_threshold",
-			"Minimum number of tuple updates or deletes prior to vacuum",
-			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
-			ShareUpdateExclusiveLock
-		},
-		-1, 0, INT_MAX
-	},
-	{
-		{
-			"autovacuum_vacuum_insert_threshold",
-			"Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums",
-			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
-			ShareUpdateExclusiveLock
-		},
-		-2, -1, INT_MAX
-	},
-	{
-		{
-			"autovacuum_analyze_threshold",
-			"Minimum number of tuple inserts, updates or deletes prior to analyze",
-			RELOPT_KIND_HEAP,
-			ShareUpdateExclusiveLock
-		},
-		-1, 0, INT_MAX
-	},
-	{
-		{
 			"autovacuum_vacuum_cost_limit",
 			"Vacuum cost amount available before napping, for autovacuum",
 			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
@@ -386,18 +359,33 @@ static relopt_int intRelOpts[] =
 
 static relopt_int64 int64RelOpts[] =
 {
-	/* AALEKSEEV TODO FIXME
 	{
 		{
-			"autovacuum_freeze_min_age",
-			"Minimum age at which VACUUM should freeze a table row, for autovacuum",
+			"autovacuum_vacuum_threshold",
+			"Minimum number of tuple updates or deletes prior to vacuum",
 			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
 			ShareUpdateExclusiveLock
 		},
-		INT64CONST(-1), INT64CONST(0), INT64CONST(1000000000)
+		INT64CONST(-1), INT64CONST(0), PG_INT64_MAX
 	},
-	*/
-
+	{
+		{
+			"autovacuum_vacuum_insert_threshold",
+			"Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums",
+			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
+			ShareUpdateExclusiveLock
+		},
+		INT64CONST(-2), INT64CONST(-1), PG_INT64_MAX
+	},
+	{
+		{
+			"autovacuum_analyze_threshold",
+			"Minimum number of tuple inserts, updates or deletes prior to analyze",
+			RELOPT_KIND_HEAP,
+			ShareUpdateExclusiveLock
+		},
+		INT64CONST(-1), INT64CONST(0), PG_INT64_MAX
+	},
 	/* list terminator */
 	{{NULL}}
 };
@@ -1922,11 +1910,11 @@ default_reloptions(Datum reloptions, bool validate, relopt_kind kind)
 		{"fillfactor", RELOPT_TYPE_INT, offsetof(StdRdOptions, fillfactor)},
 		{"autovacuum_enabled", RELOPT_TYPE_BOOL,
 		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, enabled)},
-		{"autovacuum_vacuum_threshold", RELOPT_TYPE_INT,
+		{"autovacuum_vacuum_threshold", RELOPT_TYPE_INT64,
 		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_threshold)},
-		{"autovacuum_vacuum_insert_threshold", RELOPT_TYPE_INT,
+		{"autovacuum_vacuum_insert_threshold", RELOPT_TYPE_INT64,
 		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_ins_threshold)},
-		{"autovacuum_analyze_threshold", RELOPT_TYPE_INT,
+		{"autovacuum_analyze_threshold", RELOPT_TYPE_INT64,
 		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, analyze_threshold)},
 		{"autovacuum_vacuum_cost_limit", RELOPT_TYPE_INT,
 		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_cost_limit)},
