@@ -5450,7 +5450,7 @@ DefineCustomInt64Variable(const char *name,
 
 	var = (struct config_int64 *)
 		init_custom_variable(name, short_desc, long_desc, context, flags,
-							 PGC_INT64, sizeof(struct config_int));
+							 PGC_INT64, sizeof(struct config_int64));
 	var->variable = valueAddr;
 	var->boot_val = bootValue;
 	var->reset_val = bootValue;
