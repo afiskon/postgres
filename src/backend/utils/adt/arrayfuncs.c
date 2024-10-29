@@ -6917,7 +6917,7 @@ width_bucket_array_variable(Datum operand,
  * Only the first dimension is trimmed.
  */
 Datum
-trim_array(PG_FUNCTION_ARGS)
+array_trim(PG_FUNCTION_ARGS)
 {
 	ArrayType  *v = PG_GETARG_ARRAYTYPE_P(0);
 	int			n = PG_GETARG_INT32(1);

@@ -20482,9 +20482,9 @@ SELECT NULLIF(value, '(none)') ...
       <row>
        <entry role="func_table_entry"><para role="func_signature">
         <indexterm>
-         <primary>trim_array</primary>
+         <primary>array_trim</primary>
         </indexterm>
-        <function>trim_array</function> ( <parameter>array</parameter> <type>anyarray</type>, <parameter>n</parameter> <type>integer</type> )
+        <function>array_trim</function> ( <parameter>array</parameter> <type>anyarray</type>, <parameter>n</parameter> <type>integer</type> )
         <returnvalue>anyarray</returnvalue>
        </para>
        <para>
@@ -20492,7 +20492,7 @@ SELECT NULLIF(value, '(none)') ...
         If the array is multidimensional, only the first dimension is trimmed.
        </para>
        <para>
-        <literal>trim_array(ARRAY[1,2,3,4,5,6], 2)</literal>
+        <literal>array_trim(ARRAY[1,2,3,4,5,6], 2)</literal>
         <returnvalue>{1,2,3,4}</returnvalue>
        </para></entry>
       </row>
