@@ -55,6 +55,21 @@
 
       <row>
        <entry role="func_table_entry"><para role="func_signature">
+        <function>rand_array</function> ( <parameter>numvals</parameter> <type>integer</type>, <parameter>minlen</parameter> <type>integer</type>, <parameter>maxlen</parameter> <type>integer</type>, <parameter>minval</parameter> <type><replaceable>numeric_type</replaceable></type>, <parameter>maxval</parameter> <type><replaceable>numeric_type</replaceable></type> )
+        <returnvalue>setof <replaceable>numeric_type[]</replaceable></returnvalue>
+       </para>
+       <para>
+        Produces a set of random-length <replaceable>numeric_type[]</replaceable>
+        arrays of uniformly distributed random values, using the
+        <function>random()</function> functions listed in
+        <xref linkend="functions-math-random-table"/>; available for
+        <type>integer</type>, <type>bigint</type>, and <type>numeric</type>.
+       </para>
+       </entry>
+      </row>
+
+      <row>
+       <entry role="func_table_entry"><para role="func_signature">
         <function>crosstab</function> ( <parameter>sql</parameter> <type>text</type> )
         <returnvalue>setof record</returnvalue>
        </para>
@@ -162,6 +177,57 @@ test=# SELECT * FROM normal_rand(1000, 5, 3);
      4.82992125404908
      9.71308014517282
      2.49639286969028
+(1000 rows)
+</screen>
+  </sect3>
+
+  <sect3 id="tablefunc-functions-rand-array">
+   <title><function>rand_array</function></title>
+
+   <indexterm>
+    <primary>rand_array</primary>
+   </indexterm>
+
+<synopsis>
+rand_array(int numvals, int minlen, int maxlen, int minval, int maxval) returns setof int[]
+rand_array(int numvals, int minlen, int maxlen, bigint minval, bigint maxval) returns setof bigint[]
+rand_array(int numvals, int minlen, int maxlen, numeric minval, numeric maxval) returns setof numeric[]
+</synopsis>
+
+   <para>
+    <function>rand_array</function> produces a set of random-length arrays of
+    uniformly distributed random values.
+   </para>
+
+   <para>
+    <parameter>numvals</parameter> is the number of arrays to be returned
+    by the function. <parameter>minlen</parameter> and
+    <parameter>maxlen</parameter> are the minumum and maximum lengths of each
+    array, and <parameter>minval</parameter> and <parameter>maxval</parameter>
+    are the minumum and maximum values of each array element.
+   </para>
+
+   <para>
+    For example, this call requests 1000 arrays with lengths between 0 and 4
+    and elements of type <type>numeric</type> with values between
+    <literal>-1.0</literal> and <literal>1.0</literal>:
+   </para>
+
+<screen>
+test=# SELECT * FROM rand_array(1000, 0, 4, -1.0, 1.0);
+      rand_array       
+-----------------------
+ {1.0,-1.0,-0.7}
+ {1.0}
+ {-0.6,-0.7}
+ {-0.9,-0.9,-0.6,0.5}
+ {}
+     .
+     .
+     .
+ {0.0,-0.8}
+ {}
+ {-0.9,-0.9}
 (1000 rows)
 </screen>
   </sect3>

@@ -42,7 +42,9 @@
 #include "funcapi.h"
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
+#include "utils/array.h"
 #include "utils/builtins.h"
+#include "utils/fmgroids.h"
 
 PG_MODULE_MAGIC;
 
@@ -83,6 +85,9 @@ static void build_tuplestore_recursively(char *key_fld,
 										 AttInMetadata *attinmeta,
 										 Tuplestorestate *tupstore);
 
+/*
+ * cross-call data structure for SRF normal_rand()
+ */
 typedef struct
 {
 	float8		mean;			/* mean of the distribution */
@@ -90,6 +95,15 @@ typedef struct
 	float8		carry_val;		/* hold second generated value */
 	bool		use_carry;		/* use second generated value */
 } normal_rand_fctx;
+
+/*
+ * cross-call data structure for SRF rand_array()
+ */
+typedef struct
+{
+	FunctionCallInfo random_len_fcinfo; /* random array length function */
+	FunctionCallInfo random_val_fcinfo; /* random array elem value function */
+} rand_array_fctx;
 
 #define xpfree(var_) \
 	do { \
@@ -311,6 +325,189 @@ get_normal_pair(float8 *x1, float8 *x2)
 		*x1 = v1 * s;
 		*x2 = v2 * s;
 	}
+}
+
+/*
+ * rand_array_internal()
+ *		Return the requested number of random-length arrays, filled with
+ *		random values of the specified datatype.
+ *
+ * Inputs:
+ * fcinfo: includes the number of arrays to return, minlen and maxlen array
+ * length bounds, and minval and maxval array element bounds.
+ * datatype: the datatype of the array elements.
+ *
+ * returns setof datatype[].
+ */
+static Datum
+rand_array_internal(FunctionCallInfo fcinfo, Oid datatype)
+{
+	FuncCallContext *funcctx;
+	rand_array_fctx *fctx;
+
+	/* stuff done only on the first call of the function */
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
+		int32		num_tuples;
+		int32		minlen;
+		int32		maxlen;
+		Datum		minval;
+		Datum		maxval;
+		Oid			random_fn_oid;
+		FmgrInfo   *random_len_flinfo;
+		FunctionCallInfo random_len_fcinfo;
+		FmgrInfo   *random_val_flinfo;
+		FunctionCallInfo random_val_fcinfo;
+
+		/* create a function context for cross-call persistence */
+		funcctx = SRF_FIRSTCALL_INIT();
+
+		/*
+		 * switch to memory context appropriate for multiple function calls
+		 */
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+		/* total number of tuples (arrays) to be returned */
+		num_tuples = PG_GETARG_INT32(0);
+		if (num_tuples < 0)
+			ereport(ERROR,
+					errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("number of rows cannot be negative"));
+		funcctx->max_calls = num_tuples;
+
+		/* minimum length of arrays returned */
+		minlen = PG_GETARG_INT32(1);
+		if (minlen < 0)
+			ereport(ERROR,
+					errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("minlen must be greater than or equal to zero"));
+
+		/* maximum length of arrays returned */
+		maxlen = PG_GETARG_INT32(2);
+		if (maxlen < minlen)
+			ereport(ERROR,
+					errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("maxlen must be greater than or equal to minlen"));
+
+		/* minimum value of array elements */
+		minval = PG_GETARG_DATUM(3);
+
+		/* maximum value of array elements */
+		maxval = PG_GETARG_DATUM(4);
+
+		/* function to return each array element */
+		switch (datatype)
+		{
+			case INT4OID:
+				random_fn_oid = F_RANDOM_INT4_INT4;
+				break;
+			case INT8OID:
+				random_fn_oid = F_RANDOM_INT8_INT8;
+				break;
+			case NUMERICOID:
+				random_fn_oid = F_RANDOM_NUMERIC_NUMERIC;
+				break;
+			default:
+				elog(ERROR, "unsupported type %u for rand_array function",
+					 datatype);
+				random_fn_oid = 0;	/* keep compiler quiet */
+				break;
+		}
+
+		/* allocate memory for user context */
+		fctx = (rand_array_fctx *) palloc(sizeof(rand_array_fctx));
+
+		/*
+		 * Use fctx to keep track of upper and lower array length bounds and
+		 * upper and lower array element value bounds from call to call. These
+		 * bounds are held in the function call info for the array length and
+		 * array element functions.
+		 */
+		/* array length function: random(int, int) */
+		random_len_flinfo = (FmgrInfo *) palloc0(sizeof(FmgrInfo));
+		fmgr_info(F_RANDOM_INT4_INT4, random_len_flinfo);
+
+		random_len_fcinfo = (FunctionCallInfo) palloc0(SizeForFunctionCallInfo(2));
+		InitFunctionCallInfoData(*random_len_fcinfo, random_len_flinfo, 2,
+								 InvalidOid, NULL, NULL);
+
+		random_len_fcinfo->args[0].value = Int32GetDatum(minlen);
+		random_len_fcinfo->args[0].isnull = false;
+		random_len_fcinfo->args[1].value = Int32GetDatum(maxlen);
+		random_len_fcinfo->args[1].isnull = false;
+
+		/* array element function: random(minval, maxval) for datatype */
+		random_val_flinfo = (FmgrInfo *) palloc0(sizeof(FmgrInfo));
+		fmgr_info(random_fn_oid, random_val_flinfo);
+
+		random_val_fcinfo = (FunctionCallInfo) palloc0(SizeForFunctionCallInfo(2));
+		InitFunctionCallInfoData(*random_val_fcinfo, random_val_flinfo, 2,
+								 InvalidOid, NULL, NULL);
+
+		random_val_fcinfo->args[0].value = minval;
+		random_val_fcinfo->args[0].isnull = false;
+		random_val_fcinfo->args[1].value = maxval;
+		random_val_fcinfo->args[1].isnull = false;
+
+		/* store in SRF user context */
+		fctx->random_len_fcinfo = random_len_fcinfo;
+		fctx->random_val_fcinfo = random_val_fcinfo;
+
+		funcctx->user_fctx = fctx;
+
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	/* stuff done on every call of the function */
+	funcctx = SRF_PERCALL_SETUP();
+
+	fctx = funcctx->user_fctx;
+
+	if (funcctx->call_cntr < funcctx->max_calls)
+	{
+		int			array_len;
+		Datum	   *array_elems;
+		ArrayType  *array;
+
+		/*
+		 * Return a(nother) random-length array, filled with random values.
+		 */
+		array_len = DatumGetInt32(FunctionCallInvoke(fctx->random_len_fcinfo));
+
+		array_elems = palloc(array_len * sizeof(Datum));
+
+		for (int i = 0; i < array_len; i++)
+			array_elems[i] = FunctionCallInvoke(fctx->random_val_fcinfo);
+
+		array = construct_array_builtin(array_elems, array_len, datatype);
+
+		SRF_RETURN_NEXT(funcctx, PointerGetDatum(array));
+	}
+	else
+		/* do when there is no more left */
+		SRF_RETURN_DONE(funcctx);
+}
+
+PG_FUNCTION_INFO_V1(rand_array_int);
+Datum
+rand_array_int(PG_FUNCTION_ARGS)
+{
+	return rand_array_internal(fcinfo, INT4OID);
+}
+
+PG_FUNCTION_INFO_V1(rand_array_bigint);
+Datum
+rand_array_bigint(PG_FUNCTION_ARGS)
+{
+	return rand_array_internal(fcinfo, INT8OID);
+}
+
+PG_FUNCTION_INFO_V1(rand_array_numeric);
+Datum
+rand_array_numeric(PG_FUNCTION_ARGS)
+{
+	return rand_array_internal(fcinfo, NUMERICOID);
 }
 
 /*

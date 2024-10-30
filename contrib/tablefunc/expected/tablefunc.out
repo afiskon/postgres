@@ -13,6 +13,72 @@ SELECT avg(normal_rand)::int, count(*) FROM normal_rand(100, 250, 0.2);
 SELECT avg(normal_rand)::int, count(*) FROM normal_rand(-1, 250, 0.2);
 ERROR:  number of rows cannot be negative
 --
+-- rand_array()
+-- use setseed() to get stable results
+--
+SELECT setseed(0);
+ setseed 
+---------
+ 
+(1 row)
+
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::int, 80::int);
+ pg_typeof | rand_array 
+-----------+------------
+ integer[] | {63,71,66}
+ integer[] | {64}
+ integer[] | {54}
+ integer[] | {72,64,60}
+ integer[] | {75}
+ integer[] | {53,73}
+ integer[] | {69}
+ integer[] | {74,67}
+ integer[] | {65}
+ integer[] | {73}
+(10 rows)
+
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::bigint, 80::bigint);
+ pg_typeof | rand_array 
+-----------+------------
+ bigint[]  | {}
+ bigint[]  | {59,53}
+ bigint[]  | {72}
+ bigint[]  | {80,79}
+ bigint[]  | {71}
+ bigint[]  | {80,80}
+ bigint[]  | {61,64}
+ bigint[]  | {62,76,80}
+ bigint[]  | {}
+ bigint[]  | {}
+(10 rows)
+
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::numeric, 80::numeric);
+ pg_typeof | rand_array 
+-----------+------------
+ numeric[] | {77,66,73}
+ numeric[] | {51,53}
+ numeric[] | {65,54}
+ numeric[] | {72}
+ numeric[] | {55,72}
+ numeric[] | {}
+ numeric[] | {55,70,64}
+ numeric[] | {75}
+ numeric[] | {}
+ numeric[] | {}
+(10 rows)
+
+-- negative number of tuples
+SELECT pg_typeof(rand_array), * FROM rand_array(-1, 0, 3, 50::int, 80::int);
+ERROR:  number of rows cannot be negative
+-- invalid length bounds
+SELECT pg_typeof(rand_array), * FROM rand_array(10, -1, 3, 50::int, 80::int);
+ERROR:  minlen must be greater than or equal to zero
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 3, 0, 50::int, 80::int);
+ERROR:  maxlen must be greater than or equal to minlen
+-- invalid value bounds
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 80::int, 50::int);
+ERROR:  lower bound must be less than or equal to upper bound
+--
 -- crosstab()
 --
 CREATE TABLE ct(id int, rowclass text, rowid text, attribute text, val text);

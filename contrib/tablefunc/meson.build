@@ -18,6 +18,7 @@ contrib_targets += tablefunc
 
 install_data(
   'tablefunc--1.0.sql',
+  'tablefunc--1.0--1.1.sql',
   'tablefunc.control',
   kwargs: contrib_data_args,
 )

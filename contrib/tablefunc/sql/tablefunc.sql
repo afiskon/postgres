@@ -9,6 +9,22 @@ SELECT avg(normal_rand)::int, count(*) FROM normal_rand(100, 250, 0.2);
 SELECT avg(normal_rand)::int, count(*) FROM normal_rand(-1, 250, 0.2);
 
 --
+-- rand_array()
+-- use setseed() to get stable results
+--
+SELECT setseed(0);
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::int, 80::int);
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::bigint, 80::bigint);
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 50::numeric, 80::numeric);
+-- negative number of tuples
+SELECT pg_typeof(rand_array), * FROM rand_array(-1, 0, 3, 50::int, 80::int);
+-- invalid length bounds
+SELECT pg_typeof(rand_array), * FROM rand_array(10, -1, 3, 50::int, 80::int);
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 3, 0, 50::int, 80::int);
+-- invalid value bounds
+SELECT pg_typeof(rand_array), * FROM rand_array(10, 0, 3, 80::int, 50::int);
+
+--
 -- crosstab()
 --
 CREATE TABLE ct(id int, rowclass text, rowid text, attribute text, val text);
