@@ -46,6 +46,10 @@ SELECT c AS cidr, masklen(c) AS "masklen(cidr)",
   i AS inet, masklen(i) AS "masklen(inet)" FROM INET_TBL
   WHERE masklen(c) <= 8;
 
+SELECT i AS inet, abbrev(i) AS "abbrev(inet)" FROM INET_TBL;
+SELECT i AS inet, netmask(i) AS "netmask(inet)" FROM INET_TBL;
+SELECT i AS inet, hostmask(i) AS "hostmask(inet)" FROM INET_TBL;
+
 SELECT c AS cidr, i AS inet FROM INET_TBL
   WHERE c = i;
 
@@ -62,6 +66,16 @@ SELECT max(c) AS max, min(c) AS min FROM INET_TBL;
 
 -- check the conversion to/from text and set_netmask
 SELECT set_masklen(inet(text(i)), 24) FROM INET_TBL;
+SELECT set_masklen(cidr(text(c)), 24) FROM INET_TBL;
+
+-- just making sure these functions are callable and don't crash
+SELECT 'ok' AS result
+FROM unnest(ARRAY[
+    text(inet_client_addr()),
+    text(inet_client_port()),
+    text(inet_server_addr()),
+    text(inet_server_port())
+  ]) AS x;
 
 -- check that btree index works correctly
 CREATE INDEX inet_idx1 ON inet_tbl(i);
