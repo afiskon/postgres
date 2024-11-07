@@ -139,6 +139,7 @@ static const datetkn datetktbl[] = {
 	{"july", MONTH, 7},
 	{"jun", MONTH, 6},
 	{"june", MONTH, 6},
+	{"lmt", IGNORE_DTF, 0},		/* "lmt" (throwaway) */
 	{"m", UNITS, DTK_MONTH},	/* "month" for ISO input */
 	{"mar", MONTH, 3},
 	{"march", MONTH, 3},

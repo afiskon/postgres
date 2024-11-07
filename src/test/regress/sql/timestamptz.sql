@@ -675,3 +675,10 @@ SELECT age(timestamptz '-infinity', timestamptz '-infinity');
 -- test timestamp near POSTGRES_EPOCH_JDATE
 select timestamptz '1999-12-31 24:00:00';
 select make_timestamptz(1999, 12, 31, 24, 0, 0);
+
+-- check that LMT is an ignored date/time keyword
+select timestamptz 'Wed Jan 01 00:00:00 1000 LMT';
+-- required for this to work:
+set datestyle to Postgres;
+select '1000-01-01' :: timestamptz :: text :: timestamptz;
+reset datestyle;

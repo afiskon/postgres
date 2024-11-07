@@ -3306,3 +3306,19 @@ select make_timestamptz(1999, 12, 31, 24, 0, 0);
  Sat Jan 01 00:00:00 2000 PST
 (1 row)
 
+-- check that LMT is an ignored date/time keyword
+select timestamptz 'Wed Jan 01 00:00:00 1000 LMT';
+         timestamptz          
+------------------------------
+ Wed Jan 01 00:00:00 1000 LMT
+(1 row)
+
+-- required for this to work:
+set datestyle to Postgres;
+select '1000-01-01' :: timestamptz :: text :: timestamptz;
+         timestamptz          
+------------------------------
+ Wed Jan 01 00:00:00 1000 LMT
+(1 row)
+
+reset datestyle;
