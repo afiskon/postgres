@@ -10,6 +10,9 @@ use Test::More;
 # This test ensures that pg_upgrade renames SLRU segments.
 # After the upgrade all segments should have long file names.
 
+# equals SLRU_SEG_FILENAMES_CHANGE_CAT_VER in pg_upgrade.h
+my $slru_seg_filenames_change_cat_ver = 202411121;
+
 my @slru_dirs = (
 	"pg_xact",
 #	"pg_commit_ts", # is empty
@@ -31,7 +34,7 @@ $newnode->init();
 my $newbindir = $newnode->config_data('--bindir');
 
 # Fill data_dir of the old node with SLRU segments that use short file names.
-# pg_upgeade renames the files without looking at the content, so the content
+# pg_upgrade renames the files without looking at the content, so the content
 # is not important.
 foreach my $dir (@slru_dirs)
 {
@@ -39,6 +42,9 @@ foreach my $dir (@slru_dirs)
 	open my $fh, ">", $fname or die $!;
 	close $fh;
 }
+
+# Modify pg_control file of the old node to make it look like a version that
+# needs migration. Otherwise pg_upgrade will bypass it.
 
 command_ok(
 	[
