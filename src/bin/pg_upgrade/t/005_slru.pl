@@ -43,8 +43,14 @@ foreach my $dir (@slru_dirs)
 	close $fh;
 }
 
-# Modify pg_control file of the old node to make it look like a version that
-# needs migration. Otherwise pg_upgrade will bypass it.
+# Modify pg_control of the old node to make it look like a version that needs
+# migration (decrease ControlData->cat_ver). Otherwise pg_upgrade will skip it.
+open my $fh, "+<", $oldnode->data_dir."/global/pg_control" or die $!;
+binmode($fh);
+sysseek($fh, 12, 0);
+my $binval = pack("L!", $slru_seg_filenames_change_cat_ver - 1);
+syswrite($fh, $binval, 4);
+close($fh);
 
 command_ok(
 	[
