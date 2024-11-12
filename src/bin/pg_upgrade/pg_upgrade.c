@@ -874,11 +874,8 @@ check_slru_segment_filenames(void)
 		"pg_serial",
 	};
 
-	/*
-	TODO FIXME UNCOMMENT BEFORE COMMITTING
 	if(new_cluster.controldata.cat_ver < SLRU_SEG_FILENAMES_CHANGE_CAT_VER)
 		return;
-	*/
 
 	for (i = 0; i < sizeof(dirs)/sizeof(dirs[0]); i++)
 		rename_slru_segments(dirs[i]);

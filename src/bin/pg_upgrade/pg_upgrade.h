@@ -129,7 +129,7 @@ extern char *output_files[];
  * change of SLRU segment filenames length in 18.0
  * TODO FIXME CHANGE TO THE ACTUAL VALUE BEFORE COMMITTING
  */
-#define SLRU_SEG_FILENAMES_CHANGE_CAT_VER 20241001
+#define SLRU_SEG_FILENAMES_CHANGE_CAT_VER 202411121
 
 
 /*
