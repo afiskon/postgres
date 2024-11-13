@@ -45,16 +45,38 @@ foreach my $dir (@slru_dirs)
 
 # Modify pg_control of the old node to make it look like a version that needs
 # migration (decrease ControlData->cat_ver). Otherwise pg_upgrade will skip it.
-open my $fh, "+<", $oldnode->data_dir."/global/pg_control" or die $!;
+my $pg_control_fname = $oldnode->data_dir."/global/pg_control";
+
+open my $fh, "+<", $pg_control_fname or die $!;
 binmode($fh);
 sysseek($fh, 12, 0);
 my $binval = pack("L!", $slru_seg_filenames_change_cat_ver - 1);
 syswrite($fh, $binval, 4);
 close($fh);
 
-command_ok(
+# Calculate CRC of the updated file using pg_read_binary_file() and crc32c()
+my $fsize = -s $pg_control_fname; # WRONG! should be sizeof(ControlFile)
+$newnode->start;
+my $newcrc;
+$newnode->psql(
+	"postgres",
+	"SELECT crc32(pg_read_binary_file('".$pg_control_fname."',0,".($fsize-4)."));",
+	stdout => \$newcrc,
+	on_error_die => 1,
+	);
+$newnode->stop;
+
+# Update CRC
+open $fh, "+<", $pg_control_fname or die $!;
+binmode($fh);
+sysseek($fh, $fsize-4, 0);
+my $bincrc = pack("L!", $newcrc);
+syswrite($fh, $bincrc, 4);
+close($fh);
+
+$newnode->command_ok(
 	[
-		$newbindir.'/pg_upgrade',
+		'pg_upgrade',
 		'--old-datadir', $oldnode->data_dir,
 		'--new-datadir', $newnode->data_dir,
 		'--old-bindir', $oldbindir,
