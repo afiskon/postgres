@@ -424,7 +424,7 @@
    <para>
     Since timezone abbreviations are not well standardized,
     <productname>PostgreSQL</productname> provides a means to customize
-    the set of abbreviations accepted by the server.  The
+    the set of abbreviations accepted in datetime input.  The
     <xref linkend="guc-timezone-abbreviations"/> run-time parameter
     determines the active set of abbreviations.  While this parameter
     can be altered by any database user, the possible values for it
@@ -442,6 +442,18 @@
     characters in <varname>timezone_abbreviations</varname> prevents reading
     files outside the intended directory, as well as reading editor
     backup files and other extraneous files.)
+   </para>
+
+   <para>
+    Before consulting the <varname>timezone_abbreviations</varname> file,
+    <productname>PostgreSQL</productname> checks to see whether an
+    abbreviation used in datetime input is defined in the IANA time zone
+    database entry currently selected by the
+    <xref linkend="guc-timezone"/> run-time parameter.  If so the time
+    zone's meaning is used, for consistency with datetime output.  The
+    <varname>timezone_abbreviations</varname> file is mainly useful for
+    allowing datetime input to recognize abbreviations for time zones
+    other than the active zone.
    </para>
 
    <para>

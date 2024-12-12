@@ -1845,6 +1845,40 @@ DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t, const char *abbr, pg_tz *tzp,
 }
 
 
+/* TimeZoneAbbrevIsKnown()
+ *
+ * Detect whether the given string is a time zone abbreviation that's known
+ * in the specified TZDB timezone, and if so whether it's fixed or varying
+ * meaning.  The match is not case-sensitive.
+ */
+static bool
+TimeZoneAbbrevIsKnown(const char *abbr, pg_tz *tzp,
+					  bool *isfixed, int *offset, int *isdst)
+{
+	char		upabbr[TZ_STRLEN_MAX + 1];
+	unsigned char *p;
+	long int	gmtoff;
+
+	/* We need to force the abbrev to upper case */
+	strlcpy(upabbr, abbr, sizeof(upabbr));
+	for (p = (unsigned char *) upabbr; *p; p++)
+		*p = pg_toupper(*p);
+
+	/* Look up the abbrev's meaning in this zone */
+	if (pg_timezone_abbrev_is_known(upabbr,
+									isfixed,
+									&gmtoff,
+									isdst,
+									tzp))
+	{
+		/* Change sign to agree with DetermineTimeZoneOffset() */
+		*offset = (int) -gmtoff;
+		return true;
+	}
+	return false;
+}
+
+
 /* DecodeTimeOnly()
  * Interpret parsed string as time fields only.
  * Returns 0 if successful, DTERR code if bogus input detected.
@@ -3092,8 +3126,28 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 					 int *ftype, int *offset, pg_tz **tz,
 					 DateTimeErrorExtra *extra)
 {
+	bool		isfixed;
+	int			isdst;
 	const datetkn *tp;
 
+	/*
+	 * See if the current session_timezone recognizes it.  Checking this
+	 * before zoneabbrevtbl allows us to correctly handle abbreviations whose
+	 * meaning varies across zones, such as "LMT".  (Caching this lookup is
+	 * left for later.)
+	 */
+	if (session_timezone &&
+		TimeZoneAbbrevIsKnown(lowtoken, session_timezone,
+							  &isfixed, offset, &isdst))
+	{
+		*ftype = (isfixed ? (isdst ? DTZ : TZ) : DYNTZ);
+		*tz = (isfixed ? NULL : session_timezone);
+		/* flip sign to agree with the convention used in zoneabbrevtbl */
+		*offset = -(*offset);
+		return 0;
+	}
+
+	/* Nope, so look in zoneabbrevtbl */
 	tp = abbrevcache[field];
 	/* use strncmp so that we match truncated tokens */
 	if (tp == NULL || strncmp(lowtoken, tp->token, TOKMAXLEN) != 0)
@@ -3109,6 +3163,7 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 		*ftype = UNKNOWN_FIELD;
 		*offset = 0;
 		*tz = NULL;
+		/* failure results are not cached */
 	}
 	else
 	{
@@ -3278,9 +3333,6 @@ DecodeTimezoneAbbrevPrefix(const char *str, int *offset, pg_tz **tz)
 	*offset = 0;				/* avoid uninitialized vars on failure */
 	*tz = NULL;
 
-	if (!zoneabbrevtbl)
-		return -1;				/* no abbrevs known, so fail immediately */
-
 	/* Downcase as much of the string as we could need */
 	for (len = 0; len < TOKMAXLEN; len++)
 	{
@@ -3299,9 +3351,34 @@ DecodeTimezoneAbbrevPrefix(const char *str, int *offset, pg_tz **tz)
 	 */
 	while (len > 0)
 	{
-		const datetkn *tp = datebsearch(lowtoken, zoneabbrevtbl->abbrevs,
-										zoneabbrevtbl->numabbrevs);
+		bool		isfixed;
+		int			isdst;
+		const datetkn *tp;
 
+		/* See if the current session_timezone recognizes it. */
+		if (session_timezone &&
+			TimeZoneAbbrevIsKnown(lowtoken, session_timezone,
+								  &isfixed, offset, &isdst))
+		{
+			if (isfixed)
+			{
+				/* flip sign to agree with the convention in zoneabbrevtbl */
+				*offset = -(*offset);
+			}
+			else
+			{
+				/* Caller must resolve the abbrev's current meaning */
+				*tz = session_timezone;
+			}
+			return len;
+		}
+
+		/* Known in zoneabbrevtbl? */
+		if (zoneabbrevtbl)
+			tp = datebsearch(lowtoken, zoneabbrevtbl->abbrevs,
+							 zoneabbrevtbl->numabbrevs);
+		else
+			tp = NULL;
 		if (tp != NULL)
 		{
 			if (tp->type == DYNTZ)
@@ -3324,6 +3401,8 @@ DecodeTimezoneAbbrevPrefix(const char *str, int *offset, pg_tz **tz)
 				return len;
 			}
 		}
+
+		/* Nope, try the next shorter string. */
 		lowtoken[--len] = '\0';
 	}
 

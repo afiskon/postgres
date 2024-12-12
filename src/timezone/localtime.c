@@ -1844,6 +1844,82 @@ pg_interpret_timezone_abbrev(const char *abbrev,
 }
 
 /*
+ * Detect whether a timezone abbreviation is defined within the given zone.
+ *
+ * This is similar to pg_interpret_timezone_abbrev() but is not concerned
+ * with a specific point in time.  We want to know if the abbreviation is
+ * known at all, and if so whether it has one meaning or several.
+ *
+ * Returns true if the abbreviation is known, false if not.
+ * If the abbreviation is known and has a single meaning (only one value
+ * of gmtoff/isdst), sets *isfixed = true and sets *gmtoff and *isdst.
+ * If there are multiple meanings, sets *isfixed = false.
+ *
+ * Note: abbrev is matched case-sensitively; it should be all-upper-case.
+ */
+bool
+pg_timezone_abbrev_is_known(const char *abbrev,
+							bool *isfixed,
+							long int *gmtoff,
+							int *isdst,
+							const pg_tz *tz)
+{
+	bool		result = false;
+	const struct state *sp = &tz->state;
+	const char *abbrs;
+	int			abbrind;
+
+	/*
+	 * Locate the abbreviation in the zone's abbreviation list.  We assume
+	 * there are not duplicates in the list.
+	 */
+	abbrs = sp->chars;
+	abbrind = 0;
+	while (abbrind < sp->charcnt)
+	{
+		if (strcmp(abbrev, abbrs + abbrind) == 0)
+			break;
+		while (abbrs[abbrind] != '\0')
+			abbrind++;
+		abbrind++;
+	}
+	if (abbrind >= sp->charcnt)
+		return false;			/* definitely not there */
+
+	/*
+	 * Scan the ttinfo array to find uses of the abbreviation.
+	 */
+	for (int i = 0; i < sp->typecnt; i++)
+	{
+		const struct ttinfo *ttisp = &sp->ttis[i];
+
+		if (ttisp->tt_desigidx == abbrind)
+		{
+			if (!result)
+			{
+				/* First usage */
+				*isfixed = true;	/* for the moment */
+				*gmtoff = ttisp->tt_utoff;
+				*isdst = ttisp->tt_isdst;
+				result = true;
+			}
+			else
+			{
+				/* Second or later usage, does it match? */
+				if (*gmtoff != ttisp->tt_utoff ||
+					*isdst != ttisp->tt_isdst)
+				{
+					*isfixed = false;
+					break;		/* no point in looking further */
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+/*
  * If the given timezone uses only one GMT offset, store that offset
  * into *gmtoff and return true, else return false.
  */
