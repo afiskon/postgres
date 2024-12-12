@@ -259,7 +259,17 @@ static const datetkn *datecache[MAXDATEFIELDS] = {NULL};
 
 static const datetkn *deltacache[MAXDATEFIELDS] = {NULL};
 
-static const datetkn *abbrevcache[MAXDATEFIELDS] = {NULL};
+/* Cache for results of timezone abbreviation lookups */
+
+typedef struct TzAbbrevCache
+{
+	char		abbrev[TOKMAXLEN + 1];	/* always NUL-terminated */
+	char		ftype;			/* TZ, DTZ, or DYNTZ */
+	int			offset;			/* GMT offset, if fixed-offset */
+	pg_tz	   *tz;				/* relevant zone, if variable-offset */
+} TzAbbrevCache;
+
+static TzAbbrevCache tzabbrevcache[MAXDATEFIELDS];
 
 
 /*
@@ -3126,15 +3136,28 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 					 int *ftype, int *offset, pg_tz **tz,
 					 DateTimeErrorExtra *extra)
 {
+	TzAbbrevCache *tzc = &tzabbrevcache[field];
 	bool		isfixed;
 	int			isdst;
 	const datetkn *tp;
 
 	/*
+	 * Do we have a cached result?  Use strncmp so that we match truncated
+	 * names, although we shouldn't really see that happen with normal
+	 * abbreviations.
+	 */
+	if (strncmp(lowtoken, tzc->abbrev, TOKMAXLEN) == 0)
+	{
+		*ftype = tzc->ftype;
+		*offset = tzc->offset;
+		*tz = tzc->tz;
+		return 0;
+	}
+
+	/*
 	 * See if the current session_timezone recognizes it.  Checking this
 	 * before zoneabbrevtbl allows us to correctly handle abbreviations whose
-	 * meaning varies across zones, such as "LMT".  (Caching this lookup is
-	 * left for later.)
+	 * meaning varies across zones, such as "LMT".
 	 */
 	if (session_timezone &&
 		TimeZoneAbbrevIsKnown(lowtoken, session_timezone,
@@ -3144,20 +3167,20 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 		*tz = (isfixed ? NULL : session_timezone);
 		/* flip sign to agree with the convention used in zoneabbrevtbl */
 		*offset = -(*offset);
+		/* cache result; use strlcpy to truncate name if necessary */
+		strlcpy(tzc->abbrev, lowtoken, TOKMAXLEN + 1);
+		tzc->ftype = *ftype;
+		tzc->offset = *offset;
+		tzc->tz = *tz;
 		return 0;
 	}
 
 	/* Nope, so look in zoneabbrevtbl */
-	tp = abbrevcache[field];
-	/* use strncmp so that we match truncated tokens */
-	if (tp == NULL || strncmp(lowtoken, tp->token, TOKMAXLEN) != 0)
-	{
-		if (zoneabbrevtbl)
-			tp = datebsearch(lowtoken, zoneabbrevtbl->abbrevs,
-							 zoneabbrevtbl->numabbrevs);
-		else
-			tp = NULL;
-	}
+	if (zoneabbrevtbl)
+		tp = datebsearch(lowtoken, zoneabbrevtbl->abbrevs,
+						 zoneabbrevtbl->numabbrevs);
+	else
+		tp = NULL;
 	if (tp == NULL)
 	{
 		*ftype = UNKNOWN_FIELD;
@@ -3167,7 +3190,6 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 	}
 	else
 	{
-		abbrevcache[field] = tp;
 		*ftype = tp->type;
 		if (tp->type == DYNTZ)
 		{
@@ -3181,9 +3203,24 @@ DecodeTimezoneAbbrev(int field, const char *lowtoken,
 			*offset = tp->value;
 			*tz = NULL;
 		}
+
+		/* cache result; use strlcpy to truncate name if necessary */
+		strlcpy(tzc->abbrev, lowtoken, TOKMAXLEN + 1);
+		tzc->ftype = *ftype;
+		tzc->offset = *offset;
+		tzc->tz = *tz;
 	}
 
 	return 0;
+}
+
+/*
+ * Reset tzabbrevcache after a change in session_timezone.
+ */
+void
+ClearTimeZoneAbbrevCache(void)
+{
+	memset(tzabbrevcache, 0, sizeof(tzabbrevcache));
 }
 
 
@@ -5036,8 +5073,8 @@ void
 InstallTimeZoneAbbrevs(TimeZoneAbbrevTable *tbl)
 {
 	zoneabbrevtbl = tbl;
-	/* reset abbrevcache, which may contain pointers into old table */
-	memset(abbrevcache, 0, sizeof(abbrevcache));
+	/* reset tzabbrevcache, which may contain results from old table */
+	memset(tzabbrevcache, 0, sizeof(tzabbrevcache));
 }
 
 /*
