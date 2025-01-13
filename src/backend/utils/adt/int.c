@@ -329,6 +329,11 @@ int4send(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
+/*
+ *		===================
+ *		CONVERSION ROUTINES
+ *		===================
+ */
 
 /*
  *		Common code for bytea_int2, bytea_int4 and bytea_int8
@@ -355,9 +360,7 @@ bytea_integer(bytea* v, int max_size)
 	return result;
 }
 
-/*
- *		bytea_int2			- converts bytea to int2
- */
+/* Cast bytea -> int2 */
 Datum
 bytea_int2(PG_FUNCTION_ARGS)
 {
@@ -365,9 +368,7 @@ bytea_int2(PG_FUNCTION_ARGS)
 	PG_RETURN_INT16((int16)bytea_integer(v, sizeof(int16)));
 }
 
-/*
- *		bytea_int4			- converts bytea to int4
- */
+/* Cast bytea -> int4 */
 Datum
 bytea_int4(PG_FUNCTION_ARGS)
 {
@@ -375,9 +376,7 @@ bytea_int4(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32((int32)bytea_integer(v, sizeof(int32)));
 }
 
-/*
- *		bytea_int8			- converts bytea to int8
- */
+/* Cast bytea -> int8 */
 Datum
 bytea_int8(PG_FUNCTION_ARGS)
 {
@@ -385,11 +384,26 @@ bytea_int8(PG_FUNCTION_ARGS)
 	PG_RETURN_INT64(bytea_integer(v, sizeof(int64)));
 }
 
-/*
- *		===================
- *		CONVERSION ROUTINES
- *		===================
- */
+/* Cast int2 -> bytea; currently just a wrapper for int2send() */
+Datum
+int2_bytea(PG_FUNCTION_ARGS)
+{
+	return int2send(fcinfo);
+}
+
+/* Cast int4 -> bytea; currently just a wrapper for int4send() */
+Datum
+int4_bytea(PG_FUNCTION_ARGS)
+{
+	return int4send(fcinfo);
+}
+
+/* Cast int8 -> bytea; currently just a wrapper for int8send() */
+Datum
+int8_bytea(PG_FUNCTION_ARGS)
+{
+	return int8send(fcinfo);
+}
 
 Datum
 i2toi4(PG_FUNCTION_ARGS)
