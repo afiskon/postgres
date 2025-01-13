@@ -338,7 +338,7 @@ int4send(PG_FUNCTION_ARGS)
 
 /* Common code for bytea_int2, bytea_int4 and bytea_int8 */
 static int64
-bytea_integer(bytea* v, int max_size)
+bytea_integer(bytea* v, int max_size, const char* max_value)
 {
 	int 	len = VARSIZE_ANY_EXHDR(v);
 	int 	offset = 0;
@@ -347,8 +347,8 @@ bytea_integer(bytea* v, int max_size)
 	if (len > max_size)
 		ereport(ERROR,
 			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			errmsg("bytea size %d out of valid range, 0..%d",
-					len, max_size)));
+			errmsg("bytea out of valid range, ''..'\\x%s'",
+					max_value)));
 	while (len--)
 	{
 		result = result << 8;
@@ -364,7 +364,7 @@ Datum
 bytea_int2(PG_FUNCTION_ARGS)
 {
 	bytea	*v = PG_GETARG_BYTEA_PP(0);
-	PG_RETURN_INT16((int16)bytea_integer(v, sizeof(int16)));
+	PG_RETURN_INT16((int16)bytea_integer(v, sizeof(int16), "FFFF"));
 }
 
 /* Cast bytea -> int4 */
@@ -372,7 +372,7 @@ Datum
 bytea_int4(PG_FUNCTION_ARGS)
 {
 	bytea	*v = PG_GETARG_BYTEA_PP(0);
-	PG_RETURN_INT32((int32)bytea_integer(v, sizeof(int32)));
+	PG_RETURN_INT32((int32)bytea_integer(v, sizeof(int32), "FFFFFFFF"));
 }
 
 /* Cast bytea -> int8 */
@@ -380,7 +380,7 @@ Datum
 bytea_int8(PG_FUNCTION_ARGS)
 {
 	bytea	*v = PG_GETARG_BYTEA_PP(0);
-	PG_RETURN_INT64(bytea_integer(v, sizeof(int64)));
+	PG_RETURN_INT64(bytea_integer(v, sizeof(int64), "FFFFFFFFFFFFFFFF"));
 }
 
 /* Cast int2 -> bytea; currently just a wrapper for int2send() */

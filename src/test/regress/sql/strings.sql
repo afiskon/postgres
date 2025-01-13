@@ -872,3 +872,13 @@ SELECT ''::bytea::int8 = 0;
 SELECT '\x12'::bytea::int8 = 0x12;
 SELECT '\x1122334455667788'::bytea::int8 = 0x1122334455667788;
 SELECT '\x112233445566778899'::bytea::int8; -- error
+
+-- max integer values
+SELECT '\x7FFF'::bytea::int2 = 0x7FFF;
+SELECT '\x7FFFFFFF'::bytea::int4 = 0x7FFFFFFF;
+SELECT '\x7FFFFFFFFFFFFFFF'::bytea::int8 = 0x7FFFFFFFFFFFFFFF;
+
+-- min integer values
+SELECT '\x8000'::bytea::int2 = -0x8000;
+SELECT '\x80000000'::bytea::int4 = -0x80000000;
+SELECT '\x8000000000000000'::bytea::int8 = -0x8000000000000000;
