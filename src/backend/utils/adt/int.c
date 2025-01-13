@@ -335,9 +335,7 @@ int4send(PG_FUNCTION_ARGS)
  *		===================
  */
 
-/*
- *		Common code for bytea_int2, bytea_int4 and bytea_int8
- */
+/* Common code for bytea_int2, bytea_int4 and bytea_int8 */
 static int64
 bytea_integer(bytea* v, int max_size)
 {
