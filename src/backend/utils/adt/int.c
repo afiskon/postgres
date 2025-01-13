@@ -329,6 +329,7 @@ int4send(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
+
 /*
  *		===================
  *		CONVERSION ROUTINES
