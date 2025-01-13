@@ -2731,7 +2731,7 @@ SELECT '\x1234'::bytea::int2 = 0x1234;
 (1 row)
 
 SELECT '\x123456'::bytea::int2; -- error
-ERROR:  bytea size 3 out of valid range, 0..2
+ERROR:  bytea out of valid range, ''..'\xFFFF'
 SELECT ''::bytea::int4 = 0;
  ?column? 
 ----------
@@ -2751,7 +2751,7 @@ SELECT '\x12345678'::bytea::int4 = 0x12345678;
 (1 row)
 
 SELECT '\x123456789A'::bytea::int4; -- error
-ERROR:  bytea size 5 out of valid range, 0..4
+ERROR:  bytea out of valid range, ''..'\xFFFFFFFF'
 SELECT ''::bytea::int8 = 0;
  ?column? 
 ----------
@@ -2771,4 +2771,42 @@ SELECT '\x1122334455667788'::bytea::int8 = 0x1122334455667788;
 (1 row)
 
 SELECT '\x112233445566778899'::bytea::int8; -- error
-ERROR:  bytea size 9 out of valid range, 0..8
+ERROR:  bytea out of valid range, ''..'\xFFFFFFFFFFFFFFFF'
+-- max integer values
+SELECT '\x7FFF'::bytea::int2 = 0x7FFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x7FFFFFFF'::bytea::int4 = 0x7FFFFFFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x7FFFFFFFFFFFFFFF'::bytea::int8 = 0x7FFFFFFFFFFFFFFF;
+ ?column? 
+----------
+ t
+(1 row)
+
+-- min integer values
+SELECT '\x8000'::bytea::int2 = -0x8000;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x80000000'::bytea::int4 = -0x80000000;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT '\x8000000000000000'::bytea::int8 = -0x8000000000000000;
+ ?column? 
+----------
+ t
+(1 row)
+
