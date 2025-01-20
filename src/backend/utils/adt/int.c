@@ -362,7 +362,7 @@ bytea_int2(PG_FUNCTION_ARGS)
 
 	if (len > sizeof(int16))
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 				 errmsg("smallint out of range")));
 
 	PG_RETURN_INT16((int16) bytea_integer(v, len));
@@ -377,7 +377,7 @@ bytea_int4(PG_FUNCTION_ARGS)
 
 	if (len > sizeof(int32))
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 				 errmsg("integer out of range")));
 
 	PG_RETURN_INT32((int32) bytea_integer(v, len));
@@ -392,7 +392,7 @@ bytea_int8(PG_FUNCTION_ARGS)
 
 	if (len > sizeof(int64))
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 				 errmsg("bigint out of range")));
 
 
