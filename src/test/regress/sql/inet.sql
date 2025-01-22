@@ -64,9 +64,16 @@ SELECT i, c,
 SELECT max(i) AS max, min(i) AS min FROM INET_TBL;
 SELECT max(c) AS max, min(c) AS min FROM INET_TBL;
 
--- check the conversion to/from text and set_netmask
+-- check the conversion to/from text and set_masklen
 SELECT set_masklen(inet(text(i)), 24) FROM INET_TBL;
 SELECT set_masklen(cidr(text(c)), 24) FROM INET_TBL;
+
+-- check that netmask is treated as maximum value when it equals -1
+SELECT set_masklen(cidr(text(c)), -1) FROM INET_TBL;
+
+-- check that invalid netmask is rejected
+SELECT set_masklen(inet(text(i)), 33) FROM INET_TBL;
+SELECT set_masklen(cidr(text(c)), 33) FROM INET_TBL;
 
 -- check that btree index works correctly
 CREATE INDEX inet_idx1 ON inet_tbl(i);

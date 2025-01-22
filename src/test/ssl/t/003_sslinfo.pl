@@ -202,7 +202,8 @@ my @inet_funcs = qw(
     inet_server_port
 );
 
-for my $f (@inet_funcs) {
+for my $f (@inet_funcs)
+{
 	$result = $node->safe_psql(
 		"certdb",
 		"SELECT $f() IS NULL;",
