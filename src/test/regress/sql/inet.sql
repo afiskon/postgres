@@ -64,7 +64,7 @@ SELECT i, c,
 SELECT max(i) AS max, min(i) AS min FROM INET_TBL;
 SELECT max(c) AS max, min(c) AS min FROM INET_TBL;
 
--- check the conversion to/from text and set_masklen
+-- check the conversion to/from text and setting netmask
 SELECT set_masklen(inet(text(i)), 24) FROM INET_TBL;
 SELECT set_masklen(cidr(text(c)), 24) FROM INET_TBL;
 
