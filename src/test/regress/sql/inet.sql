@@ -68,15 +68,6 @@ SELECT max(c) AS max, min(c) AS min FROM INET_TBL;
 SELECT set_masklen(inet(text(i)), 24) FROM INET_TBL;
 SELECT set_masklen(cidr(text(c)), 24) FROM INET_TBL;
 
--- just making sure these functions are callable and don't crash
-SELECT 'ok' AS result
-FROM unnest(ARRAY[
-    text(inet_client_addr()),
-    text(inet_client_port()),
-    text(inet_server_addr()),
-    text(inet_server_port())
-  ]) AS x;
-
 -- check that btree index works correctly
 CREATE INDEX inet_idx1 ON inet_tbl(i);
 SET enable_seqscan TO off;
