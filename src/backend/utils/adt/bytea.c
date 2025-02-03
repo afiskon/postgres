@@ -108,16 +108,6 @@ typedef struct
 	TupleDesc	tupdesc;
 } SplitTextOutputData;
 
-/*
- * This should be large enough that most strings will fit, but small enough
- * that we feel comfortable putting it on the stack
- */
-#define TEXTBUFLEN		1024
-
-#define DatumGetVarStringP(X)		((VarString *) PG_DETOAST_DATUM(X))
-#define DatumGetVarStringPP(X)		((VarString *) PG_DETOAST_DATUM_PACKED(X))
-
-static int	varstrfastcmp_locale(char *a1p, int len1, char *a2p, int len2, SortSupport ssup);
 static bytea *bytea_catenate(bytea *t1, bytea *t2);
 static bytea *bytea_substring(Datum str,
 							  int S,
@@ -458,102 +448,6 @@ bytea_string_agg_finalfn(PG_FUNCTION_ARGS)
 }
 
 /* ========== PUBLIC ROUTINES ========== */
-
-/*
- * sortsupport comparison func for locale cases
- */
-static int
-varstrfastcmp_locale(char *a1p, int len1, char *a2p, int len2, SortSupport ssup)
-{
-	VarStringSortSupport *sss = (VarStringSortSupport *) ssup->ssup_extra;
-	int			result;
-	bool		arg1_match;
-
-	/* Fast pre-check for equality, as discussed in varstr_cmp() */
-	if (len1 == len2 && memcmp(a1p, a2p, len1) == 0)
-	{
-		/*
-		 * No change in buf1 or buf2 contents, so avoid changing last_len1 or
-		 * last_len2.  Existing contents of buffers might still be used by
-		 * next call.
-		 *
-		 * It's fine to allow the comparison of BpChar padding bytes here,
-		 * even though that implies that the memcmp() will usually be
-		 * performed for BpChar callers (though multibyte characters could
-		 * still prevent that from occurring).  The memcmp() is still very
-		 * cheap, and BpChar's funny semantics have us remove trailing spaces
-		 * (not limited to padding), so we need make no distinction between
-		 * padding space characters and "real" space characters.
-		 */
-		return 0;
-	}
-
-	if (sss->typid == BPCHAROID)
-	{
-		/* Get true number of bytes, ignoring trailing spaces */
-		len1 = bpchartruelen(a1p, len1);
-		len2 = bpchartruelen(a2p, len2);
-	}
-
-	if (len1 >= sss->buflen1)
-	{
-		sss->buflen1 = Max(len1 + 1, Min(sss->buflen1 * 2, MaxAllocSize));
-		sss->buf1 = repalloc(sss->buf1, sss->buflen1);
-	}
-	if (len2 >= sss->buflen2)
-	{
-		sss->buflen2 = Max(len2 + 1, Min(sss->buflen2 * 2, MaxAllocSize));
-		sss->buf2 = repalloc(sss->buf2, sss->buflen2);
-	}
-
-	/*
-	 * We're likely to be asked to compare the same strings repeatedly, and
-	 * memcmp() is so much cheaper than strcoll() that it pays to try to cache
-	 * comparisons, even though in general there is no reason to think that
-	 * that will work out (every string datum may be unique).  Caching does
-	 * not slow things down measurably when it doesn't work out, and can speed
-	 * things up by rather a lot when it does.  In part, this is because the
-	 * memcmp() compares data from cachelines that are needed in L1 cache even
-	 * when the last comparison's result cannot be reused.
-	 */
-	arg1_match = true;
-	if (len1 != sss->last_len1 || memcmp(sss->buf1, a1p, len1) != 0)
-	{
-		arg1_match = false;
-		memcpy(sss->buf1, a1p, len1);
-		sss->buf1[len1] = '\0';
-		sss->last_len1 = len1;
-	}
-
-	/*
-	 * If we're comparing the same two strings as last time, we can return the
-	 * same answer without calling strcoll() again.  This is more likely than
-	 * it seems (at least with moderate to low cardinality sets), because
-	 * quicksort compares the same pivot against many values.
-	 */
-	if (len2 != sss->last_len2 || memcmp(sss->buf2, a2p, len2) != 0)
-	{
-		memcpy(sss->buf2, a2p, len2);
-		sss->buf2[len2] = '\0';
-		sss->last_len2 = len2;
-	}
-	else if (arg1_match && !sss->cache_blob)
-	{
-		/* Use result cached following last actual strcoll() call */
-		return sss->last_returned;
-	}
-
-	result = pg_strcoll(sss->buf1, sss->buf2, sss->locale);
-
-	/* Break tie if necessary. */
-	if (result == 0 && sss->locale->deterministic)
-		result = strcmp(sss->buf1, sss->buf2);
-
-	/* Cache result, perhaps saving an expensive strcoll() call next time */
-	sss->cache_blob = false;
-	sss->last_returned = result;
-	return result;
-}
 
 /*-------------------------------------------------------------
  * byteaoctetlen
