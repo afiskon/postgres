@@ -125,49 +125,13 @@ static int	namefastcmp_locale(Datum x, Datum y, SortSupport ssup);
 static int	varstrfastcmp_locale(char *a1p, int len1, char *a2p, int len2, SortSupport ssup);
 static Datum varstr_abbrev_convert(Datum original, SortSupport ssup);
 static bool varstr_abbrev_abort(int memtupcount, SortSupport ssup);
-static int32 text_length(Datum str);
-static text *text_catenate(text *t1, text *t2);
-static text *text_substring(Datum str,
-							int32 start,
-							int32 length,
-							bool length_not_specified);
-static text *text_overlay(text *t1, text *t2, int sp, int sl);
-static int	text_position(text *t1, text *t2, Oid collid);
-static void text_position_setup(text *t1, text *t2, Oid collid, TextPositionState *state);
-static bool text_position_next(TextPositionState *state);
-static char *text_position_next_internal(char *start_ptr, TextPositionState *state);
-static char *text_position_get_match_ptr(TextPositionState *state);
-static int	text_position_get_match_pos(TextPositionState *state);
-static void text_position_cleanup(TextPositionState *state);
 static void check_collation_set(Oid collid);
-static int	text_cmp(text *arg1, text *arg2, Oid collid);
 static bytea *bytea_catenate(bytea *t1, bytea *t2);
 static bytea *bytea_substring(Datum str,
 							  int S,
 							  int L,
 							  bool length_not_specified);
 static bytea *bytea_overlay(bytea *t1, bytea *t2, int sp, int sl);
-static void appendStringInfoText(StringInfo str, const text *t);
-static bool split_text(FunctionCallInfo fcinfo, SplitTextOutputData *tstate);
-static void split_text_accum_result(SplitTextOutputData *tstate,
-									text *field_value,
-									text *null_string,
-									Oid collation);
-static text *array_to_text_internal(FunctionCallInfo fcinfo, ArrayType *v,
-									const char *fldsep, const char *null_string);
-static StringInfo makeStringAggState(FunctionCallInfo fcinfo);
-static bool text_format_parse_digits(const char **ptr, const char *end_ptr,
-									 int *value);
-static const char *text_format_parse_format(const char *start_ptr,
-											const char *end_ptr,
-											int *argpos, int *widthpos,
-											int *flags, int *width);
-static void text_format_string_conversion(StringInfo buf, char conversion,
-										  FmgrInfo *typOutputInfo,
-										  Datum value, bool isNull,
-										  int flags, int width);
-static void text_format_append_string(StringInfo buf, const char *str,
-									  int flags, int width);
 
 /*****************************************************************************
  *	 USER I/O ROUTINES														 *
@@ -475,33 +439,6 @@ bytea_string_agg_finalfn(PG_FUNCTION_ARGS)
 }
 
 /* ========== PUBLIC ROUTINES ========== */
-
-/*
- * charlen_to_bytelen()
- *	Compute the number of bytes occupied by n characters starting at *p
- *
- * It is caller's responsibility that there actually are n characters;
- * the string need not be null-terminated.
- */
-static int
-charlen_to_bytelen(const char *p, int n)
-{
-	if (pg_database_encoding_max_length() == 1)
-	{
-		/* Optimization for single-byte encodings */
-		return n;
-	}
-	else
-	{
-		const char *s;
-
-		for (s = p; n > 0; n--)
-			s += pg_mblen(s);
-
-		return s - p;
-	}
-}
-
 
 static void
 check_collation_set(Oid collid)
@@ -2619,94 +2556,6 @@ build_concat_foutcache(FunctionCallInfo fcinfo, int argidx)
 	fcinfo->flinfo->fn_extra = foutcache;
 
 	return foutcache;
-}
-
-/*
- * Implementation of both concat() and concat_ws().
- *
- * sepstr is the separator string to place between values.
- * argidx identifies the first argument to concatenate (counting from zero);
- * note that this must be constant across any one series of calls.
- *
- * Returns NULL if result should be NULL, else text value.
- *
- * AALEKSEEV TODO delete?
- */
-static text *
-concat_internal(const char *sepstr, int argidx,
-				FunctionCallInfo fcinfo)
-{
-	text	   *result;
-	StringInfoData str;
-	FmgrInfo   *foutcache;
-	bool		first_arg = true;
-	int			i;
-
-	/*
-	 * concat(VARIADIC some-array) is essentially equivalent to
-	 * array_to_text(), ie concat the array elements with the given separator.
-	 * So we just pass the case off to that code.
-	 */
-	if (get_fn_expr_variadic(fcinfo->flinfo))
-	{
-		ArrayType  *arr;
-
-		/* Should have just the one argument */
-		Assert(argidx == PG_NARGS() - 1);
-
-		/* concat(VARIADIC NULL) is defined as NULL */
-		if (PG_ARGISNULL(argidx))
-			return NULL;
-
-		/*
-		 * Non-null argument had better be an array.  We assume that any call
-		 * context that could let get_fn_expr_variadic return true will have
-		 * checked that a VARIADIC-labeled parameter actually is an array.  So
-		 * it should be okay to just Assert that it's an array rather than
-		 * doing a full-fledged error check.
-		 */
-		Assert(OidIsValid(get_base_element_type(get_fn_expr_argtype(fcinfo->flinfo, argidx))));
-
-		/* OK, safe to fetch the array value */
-		arr = PG_GETARG_ARRAYTYPE_P(argidx);
-
-		/*
-		 * And serialize the array.  We tell array_to_text to ignore null
-		 * elements, which matches the behavior of the loop below.
-		 */
-		return array_to_text_internal(fcinfo, arr, sepstr, NULL);
-	}
-
-	/* Normal case without explicit VARIADIC marker */
-	initStringInfo(&str);
-
-	/* Get output function info, building it if first time through */
-	foutcache = (FmgrInfo *) fcinfo->flinfo->fn_extra;
-	if (foutcache == NULL)
-		foutcache = build_concat_foutcache(fcinfo, argidx);
-
-	for (i = argidx; i < PG_NARGS(); i++)
-	{
-		if (!PG_ARGISNULL(i))
-		{
-			Datum		value = PG_GETARG_DATUM(i);
-
-			/* add separator if appropriate */
-			if (first_arg)
-				first_arg = false;
-			else
-				appendStringInfoString(&str, sepstr);
-
-			/* call the appropriate type output function, append the result */
-			appendStringInfoString(&str,
-								   OutputFunctionCall(&foutcache[i], value));
-		}
-	}
-
-	result = cstring_to_text_with_len(str.data, str.len);
-	pfree(str.data);
-
-	return result;
 }
 
 /*
