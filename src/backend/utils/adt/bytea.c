@@ -484,208 +484,6 @@ check_collation_set(Oid collid)
 }
 
 /*
- * varstr_cmp()
- * AALEKSEEV TODO DELELTE?
- *
- * Comparison function for text strings with given lengths, using the
- * appropriate locale. Returns an integer less than, equal to, or greater than
- * zero, indicating whether arg1 is less than, equal to, or greater than arg2.
- *
- * Note: many functions that depend on this are marked leakproof; therefore,
- * avoid reporting the actual contents of the input when throwing errors.
- * All errors herein should be things that can't happen except on corrupt
- * data, anyway; otherwise we will have trouble with indexing strings that
- * would cause them.
- */
-int
-varstr_cmp(const char *arg1, int len1, const char *arg2, int len2, Oid collid)
-{
-	int			result;
-	pg_locale_t mylocale;
-
-	check_collation_set(collid);
-
-	mylocale = pg_newlocale_from_collation(collid);
-
-	if (mylocale->collate_is_c)
-	{
-		result = memcmp(arg1, arg2, Min(len1, len2));
-		if ((result == 0) && (len1 != len2))
-			result = (len1 < len2) ? -1 : 1;
-	}
-	else
-	{
-		/*
-		 * memcmp() can't tell us which of two unequal strings sorts first,
-		 * but it's a cheap way to tell if they're equal.  Testing shows that
-		 * memcmp() followed by strcoll() is only trivially slower than
-		 * strcoll() by itself, so we don't lose much if this doesn't work out
-		 * very often, and if it does - for example, because there are many
-		 * equal strings in the input - then we win big by avoiding expensive
-		 * collation-aware comparisons.
-		 */
-		if (len1 == len2 && memcmp(arg1, arg2, len1) == 0)
-			return 0;
-
-		result = pg_strncoll(arg1, len1, arg2, len2, mylocale);
-
-		/* Break tie if necessary. */
-		if (result == 0 && mylocale->deterministic)
-		{
-			result = memcmp(arg1, arg2, Min(len1, len2));
-			if ((result == 0) && (len1 != len2))
-				result = (len1 < len2) ? -1 : 1;
-		}
-	}
-
-	return result;
-}
-
-/*
- * Generic sortsupport interface for character type's operator classes.
- * Includes locale support, and support for BpChar semantics (i.e. removing
- * trailing spaces before comparison).
- *
- * Relies on the assumption that text, VarChar, BpChar, and bytea all have the
- * same representation.  Callers that always use the C collation (e.g.
- * non-collatable type callers like bytea) may have NUL bytes in their strings;
- * this will not work with any other collation, though.
- */
-void
-varstr_sortsupport(SortSupport ssup, Oid typid, Oid collid)
-{
-	bool		abbreviate = ssup->abbreviate;
-	bool		collate_c = false;
-	VarStringSortSupport *sss;
-	pg_locale_t locale;
-
-	check_collation_set(collid);
-
-	locale = pg_newlocale_from_collation(collid);
-
-	/*
-	 * If possible, set ssup->comparator to a function which can be used to
-	 * directly compare two datums.  If we can do this, we'll avoid the
-	 * overhead of a trip through the fmgr layer for every comparison, which
-	 * can be substantial.
-	 *
-	 * Most typically, we'll set the comparator to varlenafastcmp_locale,
-	 * which uses strcoll() to perform comparisons.  We use that for the
-	 * BpChar case too, but type NAME uses namefastcmp_locale. However, if
-	 * LC_COLLATE = C, we can make things quite a bit faster with
-	 * varstrfastcmp_c, bpcharfastcmp_c, or namefastcmp_c, all of which use
-	 * memcmp() rather than strcoll().
-	 */
-	if (locale->collate_is_c)
-	{
-		if (typid == BPCHAROID)
-			ssup->comparator = bpcharfastcmp_c;
-		else if (typid == NAMEOID)
-		{
-			ssup->comparator = namefastcmp_c;
-			/* Not supporting abbreviation with type NAME, for now */
-			abbreviate = false;
-		}
-		else
-			ssup->comparator = varstrfastcmp_c;
-
-		collate_c = true;
-	}
-	else
-	{
-		/*
-		 * We use varlenafastcmp_locale except for type NAME.
-		 */
-		if (typid == NAMEOID)
-		{
-			ssup->comparator = namefastcmp_locale;
-			/* Not supporting abbreviation with type NAME, for now */
-			abbreviate = false;
-		}
-		else
-			ssup->comparator = varlenafastcmp_locale;
-
-		/*
-		 * Unfortunately, it seems that abbreviation for non-C collations is
-		 * broken on many common platforms; see pg_strxfrm_enabled().
-		 *
-		 * Even apart from the risk of broken locales, it's possible that
-		 * there are platforms where the use of abbreviated keys should be
-		 * disabled at compile time.  Having only 4 byte datums could make
-		 * worst-case performance drastically more likely, for example.
-		 * Moreover, macOS's strxfrm() implementation is known to not
-		 * effectively concentrate a significant amount of entropy from the
-		 * original string in earlier transformed blobs.  It's possible that
-		 * other supported platforms are similarly encumbered.  So, if we ever
-		 * get past disabling this categorically, we may still want or need to
-		 * disable it for particular platforms.
-		 */
-		if (!pg_strxfrm_enabled(locale))
-			abbreviate = false;
-	}
-
-	/*
-	 * If we're using abbreviated keys, or if we're using a locale-aware
-	 * comparison, we need to initialize a VarStringSortSupport object. Both
-	 * cases will make use of the temporary buffers we initialize here for
-	 * scratch space (and to detect requirement for BpChar semantics from
-	 * caller), and the abbreviation case requires additional state.
-	 */
-	if (abbreviate || !collate_c)
-	{
-		sss = palloc(sizeof(VarStringSortSupport));
-		sss->buf1 = palloc(TEXTBUFLEN);
-		sss->buflen1 = TEXTBUFLEN;
-		sss->buf2 = palloc(TEXTBUFLEN);
-		sss->buflen2 = TEXTBUFLEN;
-		/* Start with invalid values */
-		sss->last_len1 = -1;
-		sss->last_len2 = -1;
-		/* Initialize */
-		sss->last_returned = 0;
-		if (collate_c)
-			sss->locale = NULL;
-		else
-			sss->locale = locale;
-
-		/*
-		 * To avoid somehow confusing a strxfrm() blob and an original string,
-		 * constantly keep track of the variety of data that buf1 and buf2
-		 * currently contain.
-		 *
-		 * Comparisons may be interleaved with conversion calls.  Frequently,
-		 * conversions and comparisons are batched into two distinct phases,
-		 * but the correctness of caching cannot hinge upon this.  For
-		 * comparison caching, buffer state is only trusted if cache_blob is
-		 * found set to false, whereas strxfrm() caching only trusts the state
-		 * when cache_blob is found set to true.
-		 *
-		 * Arbitrarily initialize cache_blob to true.
-		 */
-		sss->cache_blob = true;
-		sss->collate_c = collate_c;
-		sss->typid = typid;
-		ssup->ssup_extra = sss;
-
-		/*
-		 * If possible, plan to use the abbreviated keys optimization.  The
-		 * core code may switch back to authoritative comparator should
-		 * abbreviation be aborted.
-		 */
-		if (abbreviate)
-		{
-			sss->prop_card = 0.20;
-			initHyperLogLog(&sss->abbr_card, 10);
-			initHyperLogLog(&sss->full_card, 10);
-			ssup->abbrev_full_comparator = ssup->comparator;
-			ssup->comparator = ssup_datum_unsigned_cmp;
-			ssup->abbrev_converter = varstr_abbrev_convert;
-			ssup->abbrev_abort = varstr_abbrev_abort;
-		}
-	}
-}
-
-/*
  * sortsupport comparison func (for C locale case)
  */
 static int
@@ -1223,24 +1021,6 @@ varstr_abbrev_abort(int memtupcount, SortSupport ssup)
 	return true;
 }
 
-/*
- * Generic equalimage support function for character type's operator classes.
- * Disables the use of deduplication with nondeterministic collations.
- */
-Datum
-btvarstrequalimage(PG_FUNCTION_ARGS)
-{
-	/* Oid		opcintype = PG_GETARG_OID(0); */
-	Oid			collid = PG_GET_COLLATION();
-	pg_locale_t locale;
-
-	check_collation_set(collid);
-
-	locale = pg_newlocale_from_collation(collid);
-
-	PG_RETURN_BOOL(locale->deterministic);
-}
-
 /*-------------------------------------------------------------
  * byteaoctetlen
  *
@@ -1680,358 +1460,6 @@ byteaSetBit(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(res);
 }
 
-/*
- * SplitIdentifierString --- parse a string containing identifiers
- * AALEKSEEV TODO DELETE?
- *
- * This is the guts of textToQualifiedNameList, and is exported for use in
- * other situations such as parsing GUC variables.  In the GUC case, it's
- * important to avoid memory leaks, so the API is designed to minimize the
- * amount of stuff that needs to be allocated and freed.
- *
- * Inputs:
- *	rawstring: the input string; must be overwritable!	On return, it's
- *			   been modified to contain the separated identifiers.
- *	separator: the separator punctuation expected between identifiers
- *			   (typically '.' or ',').  Whitespace may also appear around
- *			   identifiers.
- * Outputs:
- *	namelist: filled with a palloc'd list of pointers to identifiers within
- *			  rawstring.  Caller should list_free() this even on error return.
- *
- * Returns true if okay, false if there is a syntax error in the string.
- *
- * Note that an empty string is considered okay here, though not in
- * textToQualifiedNameList.
- */
-bool
-SplitIdentifierString(char *rawstring, char separator,
-					  List **namelist)
-{
-	char	   *nextp = rawstring;
-	bool		done = false;
-
-	*namelist = NIL;
-
-	while (scanner_isspace(*nextp))
-		nextp++;				/* skip leading whitespace */
-
-	if (*nextp == '\0')
-		return true;			/* allow empty string */
-
-	/* At the top of the loop, we are at start of a new identifier. */
-	do
-	{
-		char	   *curname;
-		char	   *endp;
-
-		if (*nextp == '"')
-		{
-			/* Quoted name --- collapse quote-quote pairs, no downcasing */
-			curname = nextp + 1;
-			for (;;)
-			{
-				endp = strchr(nextp + 1, '"');
-				if (endp == NULL)
-					return false;	/* mismatched quotes */
-				if (endp[1] != '"')
-					break;		/* found end of quoted name */
-				/* Collapse adjacent quotes into one quote, and look again */
-				memmove(endp, endp + 1, strlen(endp));
-				nextp = endp;
-			}
-			/* endp now points at the terminating quote */
-			nextp = endp + 1;
-		}
-		else
-		{
-			/* Unquoted name --- extends to separator or whitespace */
-			char	   *downname;
-			int			len;
-
-			curname = nextp;
-			while (*nextp && *nextp != separator &&
-				   !scanner_isspace(*nextp))
-				nextp++;
-			endp = nextp;
-			if (curname == nextp)
-				return false;	/* empty unquoted name not allowed */
-
-			/*
-			 * Downcase the identifier, using same code as main lexer does.
-			 *
-			 * XXX because we want to overwrite the input in-place, we cannot
-			 * support a downcasing transformation that increases the string
-			 * length.  This is not a problem given the current implementation
-			 * of downcase_truncate_identifier, but we'll probably have to do
-			 * something about this someday.
-			 */
-			len = endp - curname;
-			downname = downcase_truncate_identifier(curname, len, false);
-			Assert(strlen(downname) <= len);
-			strncpy(curname, downname, len);	/* strncpy is required here */
-			pfree(downname);
-		}
-
-		while (scanner_isspace(*nextp))
-			nextp++;			/* skip trailing whitespace */
-
-		if (*nextp == separator)
-		{
-			nextp++;
-			while (scanner_isspace(*nextp))
-				nextp++;		/* skip leading whitespace for next */
-			/* we expect another name, so done remains false */
-		}
-		else if (*nextp == '\0')
-			done = true;
-		else
-			return false;		/* invalid syntax */
-
-		/* Now safe to overwrite separator with a null */
-		*endp = '\0';
-
-		/* Truncate name if it's overlength */
-		truncate_identifier(curname, strlen(curname), false);
-
-		/*
-		 * Finished isolating current name --- add it to list
-		 */
-		*namelist = lappend(*namelist, curname);
-
-		/* Loop back if we didn't reach end of string */
-	} while (!done);
-
-	return true;
-}
-
-
-/*
- * SplitDirectoriesString --- parse a string containing file/directory names
- *
- * This works fine on file names too; the function name is historical.
- *
- * This is similar to SplitIdentifierString, except that the parsing
- * rules are meant to handle pathnames instead of identifiers: there is
- * no downcasing, embedded spaces are allowed, the max length is MAXPGPATH-1,
- * and we apply canonicalize_path() to each extracted string.  Because of the
- * last, the returned strings are separately palloc'd rather than being
- * pointers into rawstring --- but we still scribble on rawstring.
- *
- * Inputs:
- *	rawstring: the input string; must be modifiable!
- *	separator: the separator punctuation expected between directories
- *			   (typically ',' or ';').  Whitespace may also appear around
- *			   directories.
- * Outputs:
- *	namelist: filled with a palloc'd list of directory names.
- *			  Caller should list_free_deep() this even on error return.
- *
- * Returns true if okay, false if there is a syntax error in the string.
- *
- * Note that an empty string is considered okay here.
- */
-bool
-SplitDirectoriesString(char *rawstring, char separator,
-					   List **namelist)
-{
-	char	   *nextp = rawstring;
-	bool		done = false;
-
-	*namelist = NIL;
-
-	while (scanner_isspace(*nextp))
-		nextp++;				/* skip leading whitespace */
-
-	if (*nextp == '\0')
-		return true;			/* allow empty string */
-
-	/* At the top of the loop, we are at start of a new directory. */
-	do
-	{
-		char	   *curname;
-		char	   *endp;
-
-		if (*nextp == '"')
-		{
-			/* Quoted name --- collapse quote-quote pairs */
-			curname = nextp + 1;
-			for (;;)
-			{
-				endp = strchr(nextp + 1, '"');
-				if (endp == NULL)
-					return false;	/* mismatched quotes */
-				if (endp[1] != '"')
-					break;		/* found end of quoted name */
-				/* Collapse adjacent quotes into one quote, and look again */
-				memmove(endp, endp + 1, strlen(endp));
-				nextp = endp;
-			}
-			/* endp now points at the terminating quote */
-			nextp = endp + 1;
-		}
-		else
-		{
-			/* Unquoted name --- extends to separator or end of string */
-			curname = endp = nextp;
-			while (*nextp && *nextp != separator)
-			{
-				/* trailing whitespace should not be included in name */
-				if (!scanner_isspace(*nextp))
-					endp = nextp + 1;
-				nextp++;
-			}
-			if (curname == endp)
-				return false;	/* empty unquoted name not allowed */
-		}
-
-		while (scanner_isspace(*nextp))
-			nextp++;			/* skip trailing whitespace */
-
-		if (*nextp == separator)
-		{
-			nextp++;
-			while (scanner_isspace(*nextp))
-				nextp++;		/* skip leading whitespace for next */
-			/* we expect another name, so done remains false */
-		}
-		else if (*nextp == '\0')
-			done = true;
-		else
-			return false;		/* invalid syntax */
-
-		/* Now safe to overwrite separator with a null */
-		*endp = '\0';
-
-		/* Truncate path if it's overlength */
-		if (strlen(curname) >= MAXPGPATH)
-			curname[MAXPGPATH - 1] = '\0';
-
-		/*
-		 * Finished isolating current name --- add it to list
-		 */
-		curname = pstrdup(curname);
-		canonicalize_path(curname);
-		*namelist = lappend(*namelist, curname);
-
-		/* Loop back if we didn't reach end of string */
-	} while (!done);
-
-	return true;
-}
-
-
-/*
- * SplitGUCList --- parse a string containing identifiers or file names
- *
- * This is used to split the value of a GUC_LIST_QUOTE GUC variable, without
- * presuming whether the elements will be taken as identifiers or file names.
- * We assume the input has already been through flatten_set_variable_args(),
- * so that we need never downcase (if appropriate, that was done already).
- * Nor do we ever truncate, since we don't know the correct max length.
- * We disallow embedded whitespace for simplicity (it shouldn't matter,
- * because any embedded whitespace should have led to double-quoting).
- * Otherwise the API is identical to SplitIdentifierString.
- *
- * XXX it's annoying to have so many copies of this string-splitting logic.
- * However, it's not clear that having one function with a bunch of option
- * flags would be much better.
- *
- * XXX there is a version of this function in src/bin/pg_dump/dumputils.c.
- * Be sure to update that if you have to change this.
- *
- * Inputs:
- *	rawstring: the input string; must be overwritable!	On return, it's
- *			   been modified to contain the separated identifiers.
- *	separator: the separator punctuation expected between identifiers
- *			   (typically '.' or ',').  Whitespace may also appear around
- *			   identifiers.
- * Outputs:
- *	namelist: filled with a palloc'd list of pointers to identifiers within
- *			  rawstring.  Caller should list_free() this even on error return.
- *
- * Returns true if okay, false if there is a syntax error in the string.
- */
-bool
-SplitGUCList(char *rawstring, char separator,
-			 List **namelist)
-{
-	char	   *nextp = rawstring;
-	bool		done = false;
-
-	*namelist = NIL;
-
-	while (scanner_isspace(*nextp))
-		nextp++;				/* skip leading whitespace */
-
-	if (*nextp == '\0')
-		return true;			/* allow empty string */
-
-	/* At the top of the loop, we are at start of a new identifier. */
-	do
-	{
-		char	   *curname;
-		char	   *endp;
-
-		if (*nextp == '"')
-		{
-			/* Quoted name --- collapse quote-quote pairs */
-			curname = nextp + 1;
-			for (;;)
-			{
-				endp = strchr(nextp + 1, '"');
-				if (endp == NULL)
-					return false;	/* mismatched quotes */
-				if (endp[1] != '"')
-					break;		/* found end of quoted name */
-				/* Collapse adjacent quotes into one quote, and look again */
-				memmove(endp, endp + 1, strlen(endp));
-				nextp = endp;
-			}
-			/* endp now points at the terminating quote */
-			nextp = endp + 1;
-		}
-		else
-		{
-			/* Unquoted name --- extends to separator or whitespace */
-			curname = nextp;
-			while (*nextp && *nextp != separator &&
-				   !scanner_isspace(*nextp))
-				nextp++;
-			endp = nextp;
-			if (curname == nextp)
-				return false;	/* empty unquoted name not allowed */
-		}
-
-		while (scanner_isspace(*nextp))
-			nextp++;			/* skip trailing whitespace */
-
-		if (*nextp == separator)
-		{
-			nextp++;
-			while (scanner_isspace(*nextp))
-				nextp++;		/* skip leading whitespace for next */
-			/* we expect another name, so done remains false */
-		}
-		else if (*nextp == '\0')
-			done = true;
-		else
-			return false;		/* invalid syntax */
-
-		/* Now safe to overwrite separator with a null */
-		*endp = '\0';
-
-		/*
-		 * Finished isolating current name --- add it to list
-		 */
-		*namelist = lappend(*namelist, curname);
-
-		/* Loop back if we didn't reach end of string */
-	} while (!done);
-
-	return true;
-}
-
 
 /*****************************************************************************
  *	Comparison Functions used for bytea
@@ -2262,196 +1690,53 @@ bytea_sortsupport(PG_FUNCTION_ARGS)
 }
 
 /*
- * Return the size of a datum, possibly compressed
- * AALEKSEEV TODO keep only in varlana.c?
- *
- * Works on any data type
- */
-Datum
-pg_column_size(PG_FUNCTION_ARGS)
-{
-	Datum		value = PG_GETARG_DATUM(0);
-	int32		result;
-	int			typlen;
-
-	/* On first call, get the input type's typlen, and save at *fn_extra */
-	if (fcinfo->flinfo->fn_extra == NULL)
-	{
-		/* Lookup the datatype of the supplied argument */
-		Oid			argtypeid = get_fn_expr_argtype(fcinfo->flinfo, 0);
-
-		typlen = get_typlen(argtypeid);
-		if (typlen == 0)		/* should not happen */
-			elog(ERROR, "cache lookup failed for type %u", argtypeid);
-
-		fcinfo->flinfo->fn_extra = MemoryContextAlloc(fcinfo->flinfo->fn_mcxt,
-													  sizeof(int));
-		*((int *) fcinfo->flinfo->fn_extra) = typlen;
-	}
-	else
-		typlen = *((int *) fcinfo->flinfo->fn_extra);
-
-	if (typlen == -1)
-	{
-		/* varlena type, possibly toasted */
-		result = toast_datum_size(value);
-	}
-	else if (typlen == -2)
-	{
-		/* cstring */
-		result = strlen(DatumGetCString(value)) + 1;
-	}
-	else
-	{
-		/* ordinary fixed-width type */
-		result = typlen;
-	}
-
-	PG_RETURN_INT32(result);
-}
-
-/*
- * Return the compression method stored in the compressed attribute.  Return
- * NULL for non varlena type or uncompressed data.
- */
-Datum
-pg_column_compression(PG_FUNCTION_ARGS)
-{
-	int			typlen;
-	char	   *result;
-	ToastCompressionId cmid;
-
-	/* On first call, get the input type's typlen, and save at *fn_extra */
-	if (fcinfo->flinfo->fn_extra == NULL)
-	{
-		/* Lookup the datatype of the supplied argument */
-		Oid			argtypeid = get_fn_expr_argtype(fcinfo->flinfo, 0);
-
-		typlen = get_typlen(argtypeid);
-		if (typlen == 0)		/* should not happen */
-			elog(ERROR, "cache lookup failed for type %u", argtypeid);
-
-		fcinfo->flinfo->fn_extra = MemoryContextAlloc(fcinfo->flinfo->fn_mcxt,
-													  sizeof(int));
-		*((int *) fcinfo->flinfo->fn_extra) = typlen;
-	}
-	else
-		typlen = *((int *) fcinfo->flinfo->fn_extra);
-
-	if (typlen != -1)
-		PG_RETURN_NULL();
-
-	/* get the compression method id stored in the compressed varlena */
-	cmid = toast_get_compression_id((struct varlena *)
-									DatumGetPointer(PG_GETARG_DATUM(0)));
-	if (cmid == TOAST_INVALID_COMPRESSION_ID)
-		PG_RETURN_NULL();
-
-	/* convert compression method id to compression method name */
-	switch (cmid)
-	{
-		case TOAST_PGLZ_COMPRESSION_ID:
-			result = "pglz";
-			break;
-		case TOAST_LZ4_COMPRESSION_ID:
-			result = "lz4";
-			break;
-		default:
-			elog(ERROR, "invalid compression method id %d", cmid);
-	}
-
-	PG_RETURN_TEXT_P(cstring_to_text(result));
-}
-
-/*
- * Return the chunk_id of the on-disk TOASTed value.  Return NULL if the value
- * is un-TOASTed or not on-disk.
- */
-Datum
-pg_column_toast_chunk_id(PG_FUNCTION_ARGS)
-{
-	int			typlen;
-	struct varlena *attr;
-	struct varatt_external toast_pointer;
-
-	/* On first call, get the input type's typlen, and save at *fn_extra */
-	if (fcinfo->flinfo->fn_extra == NULL)
-	{
-		/* Lookup the datatype of the supplied argument */
-		Oid			argtypeid = get_fn_expr_argtype(fcinfo->flinfo, 0);
-
-		typlen = get_typlen(argtypeid);
-		if (typlen == 0)		/* should not happen */
-			elog(ERROR, "cache lookup failed for type %u", argtypeid);
-
-		fcinfo->flinfo->fn_extra = MemoryContextAlloc(fcinfo->flinfo->fn_mcxt,
-													  sizeof(int));
-		*((int *) fcinfo->flinfo->fn_extra) = typlen;
-	}
-	else
-		typlen = *((int *) fcinfo->flinfo->fn_extra);
-
-	if (typlen != -1)
-		PG_RETURN_NULL();
-
-	attr = (struct varlena *) DatumGetPointer(PG_GETARG_DATUM(0));
-
-	if (!VARATT_IS_EXTERNAL_ONDISK(attr))
-		PG_RETURN_NULL();
-
-	VARATT_EXTERNAL_GET_POINTER(toast_pointer, attr);
-
-	PG_RETURN_OID(toast_pointer.va_valueid);
-}
-
-/*
  * string_agg_combine
  *		Aggregate combine function for string_agg(text) and string_agg(bytea)
  * AALEKSEEV TODO hmmmmmm split steing_agg(text) and string_agg(bytea) 
  */
-Datum
-string_agg_combine(PG_FUNCTION_ARGS)
-{
-	StringInfo	state1;
-	StringInfo	state2;
-	MemoryContext agg_context;
-
-	if (!AggCheckCallContext(fcinfo, &agg_context))
-		elog(ERROR, "aggregate function called in non-aggregate context");
-
-	state1 = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-	state2 = PG_ARGISNULL(1) ? NULL : (StringInfo) PG_GETARG_POINTER(1);
-
-	if (state2 == NULL)
-	{
-		/*
-		 * NULL state2 is easy, just return state1, which we know is already
-		 * in the agg_context
-		 */
-		if (state1 == NULL)
-			PG_RETURN_NULL();
-		PG_RETURN_POINTER(state1);
-	}
-
-	if (state1 == NULL)
-	{
-		/* We must copy state2's data into the agg_context */
-		MemoryContext old_context;
-
-		old_context = MemoryContextSwitchTo(agg_context);
-		state1 = makeStringAggState(fcinfo);
-		appendBinaryStringInfo(state1, state2->data, state2->len);
-		state1->cursor = state2->cursor;
-		MemoryContextSwitchTo(old_context);
-	}
-	else if (state2->len > 0)
-	{
-		/* Combine ... state1->cursor does not change in this case */
-		appendBinaryStringInfo(state1, state2->data, state2->len);
-	}
-
-	PG_RETURN_POINTER(state1);
-}
+// Datum
+// string_agg_combine(PG_FUNCTION_ARGS)
+// {
+// 	StringInfo	state1;
+// 	StringInfo	state2;
+// 	MemoryContext agg_context;
+// 
+// 	if (!AggCheckCallContext(fcinfo, &agg_context))
+// 		elog(ERROR, "aggregate function called in non-aggregate context");
+// 
+// 	state1 = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
+// 	state2 = PG_ARGISNULL(1) ? NULL : (StringInfo) PG_GETARG_POINTER(1);
+// 
+// 	if (state2 == NULL)
+// 	{
+// 		/*
+// 		 * NULL state2 is easy, just return state1, which we know is already
+// 		 * in the agg_context
+// 		 */
+// 		if (state1 == NULL)
+// 			PG_RETURN_NULL();
+// 		PG_RETURN_POINTER(state1);
+// 	}
+// 
+// 	if (state1 == NULL)
+// 	{
+// 		/* We must copy state2's data into the agg_context */
+// 		MemoryContext old_context;
+// 
+// 		old_context = MemoryContextSwitchTo(agg_context);
+// 		state1 = makeStringAggState(fcinfo);
+// 		appendBinaryStringInfo(state1, state2->data, state2->len);
+// 		state1->cursor = state2->cursor;
+// 		MemoryContextSwitchTo(old_context);
+// 	}
+// 	else if (state2->len > 0)
+// 	{
+// 		/* Combine ... state1->cursor does not change in this case */
+// 		appendBinaryStringInfo(state1, state2->data, state2->len);
+// 	}
+// 
+// 	PG_RETURN_POINTER(state1);
+// }
 
 /*
  * string_agg_serialize
@@ -2460,30 +1745,30 @@ string_agg_combine(PG_FUNCTION_ARGS)
  * This is strict, so we need not handle NULL input
  * AALEKSEEV TODO hmmmmmm split steing_agg(text) and string_agg(bytea) 
  */
-Datum
-string_agg_serialize(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-	StringInfoData buf;
-	bytea	   *result;
-
-	/* cannot be called directly because of internal-type argument */
-	Assert(AggCheckCallContext(fcinfo, NULL));
-
-	state = (StringInfo) PG_GETARG_POINTER(0);
-
-	pq_begintypsend(&buf);
-
-	/* cursor */
-	pq_sendint(&buf, state->cursor, 4);
-
-	/* data */
-	pq_sendbytes(&buf, state->data, state->len);
-
-	result = pq_endtypsend(&buf);
-
-	PG_RETURN_BYTEA_P(result);
-}
+// Datum
+// string_agg_serialize(PG_FUNCTION_ARGS)
+// {
+// 	StringInfo	state;
+// 	StringInfoData buf;
+// 	bytea	   *result;
+// 
+// 	/* cannot be called directly because of internal-type argument */
+// 	Assert(AggCheckCallContext(fcinfo, NULL));
+// 
+// 	state = (StringInfo) PG_GETARG_POINTER(0);
+// 
+// 	pq_begintypsend(&buf);
+// 
+// 	/* cursor */
+// 	pq_sendint(&buf, state->cursor, 4);
+// 
+// 	/* data */
+// 	pq_sendbytes(&buf, state->data, state->len);
+// 
+// 	result = pq_endtypsend(&buf);
+// 
+// 	PG_RETURN_BYTEA_P(result);
+// }
 
 /*
  * string_agg_deserialize
@@ -2492,61 +1777,61 @@ string_agg_serialize(PG_FUNCTION_ARGS)
  * This is strict, so we need not handle NULL input
  * AALEKSEEV TODO hmmmmmm split steing_agg(text) and string_agg(bytea) 
  */
-Datum
-string_agg_deserialize(PG_FUNCTION_ARGS)
-{
-	bytea	   *sstate;
-	StringInfo	result;
-	StringInfoData buf;
-	char	   *data;
-	int			datalen;
+// Datum
+// string_agg_deserialize(PG_FUNCTION_ARGS)
+// {
+// 	bytea	   *sstate;
+// 	StringInfo	result;
+// 	StringInfoData buf;
+// 	char	   *data;
+// 	int			datalen;
+// 
+// 	/* cannot be called directly because of internal-type argument */
+// 	Assert(AggCheckCallContext(fcinfo, NULL));
+// 
+// 	sstate = PG_GETARG_BYTEA_PP(0);
+// 
+// 	/*
+// 	 * Initialize a StringInfo so that we can "receive" it using the standard
+// 	 * recv-function infrastructure.
+// 	 */
+// 	initReadOnlyStringInfo(&buf, VARDATA_ANY(sstate),
+// 						   VARSIZE_ANY_EXHDR(sstate));
+// 
+// 	result = makeStringAggState(fcinfo);
+// 
+// 	/* cursor */
+// 	result->cursor = pq_getmsgint(&buf, 4);
+// 
+// 	/* data */
+// 	datalen = VARSIZE_ANY_EXHDR(sstate) - 4;
+// 	data = (char *) pq_getmsgbytes(&buf, datalen);
+// 	appendBinaryStringInfo(result, data, datalen);
+// 
+// 	pq_getmsgend(&buf);
+// 
+// 	PG_RETURN_POINTER(result);
+// }
 
-	/* cannot be called directly because of internal-type argument */
-	Assert(AggCheckCallContext(fcinfo, NULL));
-
-	sstate = PG_GETARG_BYTEA_PP(0);
-
-	/*
-	 * Initialize a StringInfo so that we can "receive" it using the standard
-	 * recv-function infrastructure.
-	 */
-	initReadOnlyStringInfo(&buf, VARDATA_ANY(sstate),
-						   VARSIZE_ANY_EXHDR(sstate));
-
-	result = makeStringAggState(fcinfo);
-
-	/* cursor */
-	result->cursor = pq_getmsgint(&buf, 4);
-
-	/* data */
-	datalen = VARSIZE_ANY_EXHDR(sstate) - 4;
-	data = (char *) pq_getmsgbytes(&buf, datalen);
-	appendBinaryStringInfo(result, data, datalen);
-
-	pq_getmsgend(&buf);
-
-	PG_RETURN_POINTER(result);
-}
-
-Datum
-string_agg_finalfn(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-
-	/* cannot be called directly because of internal-type argument */
-	Assert(AggCheckCallContext(fcinfo, NULL));
-
-	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-
-	if (state != NULL)
-	{
-		/* As per comment in transfn, strip data before the cursor position */
-		PG_RETURN_TEXT_P(cstring_to_text_with_len(&state->data[state->cursor],
-												  state->len - state->cursor));
-	}
-	else
-		PG_RETURN_NULL();
-}
+// Datum
+// string_agg_finalfn(PG_FUNCTION_ARGS)
+// {
+// 	StringInfo	state;
+// 
+// 	/* cannot be called directly because of internal-type argument */
+// 	Assert(AggCheckCallContext(fcinfo, NULL));
+// 
+// 	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
+// 
+// 	if (state != NULL)
+// 	{
+// 		/* As per comment in transfn, strip data before the cursor position */
+// 		PG_RETURN_TEXT_P(cstring_to_text_with_len(&state->data[state->cursor],
+// 												  state->len - state->cursor));
+// 	}
+// 	else
+// 		PG_RETURN_NULL();
+// }
 
 /*
  * Helper function for Levenshtein distance functions. Faster than memcmp(),
@@ -2567,9 +1852,9 @@ rest_of_char_same(const char *s1, const char *s2, int len)
 }
 
 /* Expand each Levenshtein distance variant */
-#include "levenshtein.c"
-#define LEVENSHTEIN_LESS_EQUAL
-#include "levenshtein.c"
+// #include "levenshtein.c"
+// #define LEVENSHTEIN_LESS_EQUAL
+// #include "levenshtein.c"
 
 
 /*
@@ -2590,17 +1875,17 @@ rest_of_char_same(const char *s1, const char *s2, int len)
  * Initialize the given state with the source string and maximum Levenshtein
  * distance to consider.
  */
-void
-initClosestMatch(ClosestMatchState *state, const char *source, int max_d)
-{
-	Assert(state);
-	Assert(max_d >= 0);
-
-	state->source = source;
-	state->min_d = -1;
-	state->max_d = max_d;
-	state->match = NULL;
-}
+// void
+// initClosestMatch(ClosestMatchState *state, const char *source, int max_d)
+// {
+// 	Assert(state);
+// 	Assert(max_d >= 0);
+// 
+// 	state->source = source;
+// 	state->min_d = -1;
+// 	state->max_d = max_d;
+// 	state->match = NULL;
+// }
 
 /*
  * If the candidate string is a closer match than the current one saved (or
@@ -2610,46 +1895,46 @@ initClosestMatch(ClosestMatchState *state, const char *source, int max_d)
  * takes no action.  Likewise, if the Levenshtein distance exceeds the maximum
  * allowed or more than half the characters are different, no action is taken.
  */
-void
-updateClosestMatch(ClosestMatchState *state, const char *candidate)
-{
-	int			dist;
-
-	Assert(state);
-
-	if (state->source == NULL || state->source[0] == '\0' ||
-		candidate == NULL || candidate[0] == '\0')
-		return;
-
-	/*
-	 * To avoid ERROR-ing, we check the lengths here instead of setting
-	 * 'trusted' to false in the call to varstr_levenshtein_less_equal().
-	 */
-	if (strlen(state->source) > MAX_LEVENSHTEIN_STRLEN ||
-		strlen(candidate) > MAX_LEVENSHTEIN_STRLEN)
-		return;
-
-	dist = varstr_levenshtein_less_equal(state->source, strlen(state->source),
-										 candidate, strlen(candidate), 1, 1, 1,
-										 state->max_d, true);
-	if (dist <= state->max_d &&
-		dist <= strlen(state->source) / 2 &&
-		(state->min_d == -1 || dist < state->min_d))
-	{
-		state->min_d = dist;
-		state->match = candidate;
-	}
-}
+// void
+// updateClosestMatch(ClosestMatchState *state, const char *candidate)
+// {
+// 	int			dist;
+// 
+// 	Assert(state);
+// 
+// 	if (state->source == NULL || state->source[0] == '\0' ||
+// 		candidate == NULL || candidate[0] == '\0')
+// 		return;
+// 
+// 	/*
+// 	 * To avoid ERROR-ing, we check the lengths here instead of setting
+// 	 * 'trusted' to false in the call to varstr_levenshtein_less_equal().
+// 	 */
+// 	if (strlen(state->source) > MAX_LEVENSHTEIN_STRLEN ||
+// 		strlen(candidate) > MAX_LEVENSHTEIN_STRLEN)
+// 		return;
+// 
+// 	dist = varstr_levenshtein_less_equal(state->source, strlen(state->source),
+// 										 candidate, strlen(candidate), 1, 1, 1,
+// 										 state->max_d, true);
+// 	if (dist <= state->max_d &&
+// 		dist <= strlen(state->source) / 2 &&
+// 		(state->min_d == -1 || dist < state->min_d))
+// 	{
+// 		state->min_d = dist;
+// 		state->match = candidate;
+// 	}
+// }
 
 /*
  * Return the closest match.  If no suitable candidates were provided via
  * updateClosestMatch(), return NULL.
  */
-const char *
-getClosestMatch(ClosestMatchState *state)
-{
-	Assert(state);
-
-	return state->match;
-}
+// const char *
+// getClosestMatch(ClosestMatchState *state)
+// {
+// 	Assert(state);
+// 
+// 	return state->match;
+// }
 
