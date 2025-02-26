@@ -36,7 +36,7 @@ with open("build/meson-logs/coverage.info") as f:
 		if line.startswith("SF:"):
 			current_file_name = line.split(":")[1]
 			line_number_to_func_name = {}
-			print("DEBUG current file: '{}'".format(current_file_name))
+			# print("DEBUG current file: '{}'".format(current_file_name))
 		elif line.startswith("FN:"):
 			temp = line.split(":")
 			temp = temp[1].split(",")
@@ -49,7 +49,7 @@ with open("build/meson-logs/coverage.info") as f:
 					line_number_to_func_name[num] = current_func_name
 
 			current_func_name = func_name
-			print("DEBUG found function '{}'".format(func_name))
+			# print("DEBUG found function '{}'".format(func_name))
 			if current_func_name not in functions:
 				current_func_name = None
 				continue
@@ -61,11 +61,10 @@ with open("build/meson-logs/coverage.info") as f:
 				'covered_lines': set()
 			}
 		else:
-			# Firstly check if there is current_function without assigned end_line and line_number_to_func_name mapping
 			if current_func_name != None:
 				if summary[current_func_name]['end_line'] == None:
-					print("TODO FIXME: function {} has no assigned end_line".format(current_func_name))
-					sys.exit(1)
+					summary[current_func_name]['end_line'] = sum(1 for _ in open(current_file_name))
+				current_func_name = None
 
 			if line.startswith("DA:"):
 				temp = line.split(":")
@@ -78,9 +77,12 @@ with open("build/meson-logs/coverage.info") as f:
 					func_name = line_number_to_func_name[line_number]
 					summary[func_name]['covered_lines'].add(line_number)
 
-print(summary)
-
 for func_name in summary:
 	lines_covered = len(summary[func_name]['covered_lines'])
 	lines_total = summary[func_name]['end_line'] - summary[func_name]['start_line']
-	print("{} -> {}%\n".format(func_name, lines_covered*100/lines_total))
+
+	if lines_total == 0:
+		# possible in certain rare cases - just ignore them
+		continue
+
+	print("{} -> {}%".format(func_name, lines_covered*100/lines_total))
