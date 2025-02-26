@@ -77,12 +77,13 @@ with open("build/meson-logs/coverage.info") as f:
 					func_name = line_number_to_func_name[line_number]
 					summary[func_name]['covered_lines'].add(line_number)
 
-for func_name in summary:
+# ignore functions with zero lines - it's possible in several cases
+func_list = filter(lambda k: summary[k]['end_line'] > summary[k]['start_line'], summary.keys())
+# sort by coverage
+func_list = sorted(func_list, key = lambda k: len(summary[k]['covered_lines']) / (summary[k]['end_line'] - summary[k]['start_line']))
+
+print("Filename,Function,Lines Covered,Lines Total,Percentage")
+for func_name in func_list:
 	lines_covered = len(summary[func_name]['covered_lines'])
 	lines_total = summary[func_name]['end_line'] - summary[func_name]['start_line']
-
-	if lines_total == 0:
-		# possible in certain rare cases - just ignore them
-		continue
-
-	print("{} -> {}%".format(func_name, lines_covered*100/lines_total))
+	print("{},{},{},{},{:.1f}%".format(summary[func_name]['file_name'], func_name, lines_covered, lines_total, lines_covered*100/lines_total))
