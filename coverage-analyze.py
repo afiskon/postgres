@@ -64,6 +64,8 @@ with open("build/meson-logs/coverage.info") as f:
 			if current_func_name != None:
 				if summary[current_func_name]['end_line'] == None:
 					summary[current_func_name]['end_line'] = sum(1 for _ in open(current_file_name))
+					for num in range(summary[current_func_name]['start_line'], summary[current_func_name]['end_line']+1):
+						line_number_to_func_name[num] = current_func_name
 				current_func_name = None
 
 			if line.startswith("DA:"):
