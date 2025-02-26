@@ -15,8 +15,7 @@ with open("src/include/catalog/pg_proc.dat") as f:
 	for m in re.finditer(re_str, proc_data):
 		func_name = m.group(1)
 		functions.add(func_name)
-
-print("Functions found: {}".format(len(functions)))
+# print("DEBUG functions found: {}".format(len(functions)))
 
 # function_name -> {
 # 'file_name': xxx
@@ -29,7 +28,6 @@ summary = {}
 current_file_name = None
 current_func_name = None
 line_number_to_func_name = {}
-
 with open("build/meson-logs/coverage.info") as f:
 	for line in f:
 		line = line.strip()
@@ -75,7 +73,7 @@ with open("build/meson-logs/coverage.info") as f:
 				exec_number = int(temp[1])
 				if exec_number > 0:
 					if line_number not in line_number_to_func_name:
-						continue # Not within any function that may interest us
+						continue # not within any function that may interest us
 					func_name = line_number_to_func_name[line_number]
 					summary[func_name]['covered_lines'].add(line_number)
 
