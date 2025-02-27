@@ -2630,6 +2630,30 @@ SELECT btrim(E'\\000trim\\000'::bytea, ''::bytea);
  \000trim\000
 (1 row)
 
+SELECT position(''::bytea IN '\x1122'::bytea);
+ position 
+----------
+        1
+(1 row)
+
+SELECT position('\x11'::bytea IN ''::bytea);
+ position 
+----------
+        0
+(1 row)
+
+SELECT position('\x3344'::bytea IN '\x11223344'::bytea);
+ position 
+----------
+        3
+(1 row)
+
+SELECT position('\x5566'::bytea IN '\x11223344'::bytea);
+ position 
+----------
+        0
+(1 row)
+
 SELECT encode(overlay(E'Th\\000omas'::bytea placing E'Th\\001omas'::bytea from 2),'escape');
    encode    
 -------------
