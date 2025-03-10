@@ -1183,6 +1183,9 @@
 { oid => '8582', descr => 'convert bytea to int8',
   proname => 'int8', prorettype => 'int8',
   proargtypes => 'bytea', prosrc => 'bytea_int8' },
+{ oid => '8583', descr => 'reverse bytea',
+  proname => 'reverse', prorettype => 'bytea', proargtypes => 'bytea',
+  prosrc => 'bytea_reverse' },
 
 { oid => '449', descr => 'hash',
   proname => 'hashint2', prorettype => 'int4', proargtypes => 'int2',
