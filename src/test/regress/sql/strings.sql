@@ -780,6 +780,14 @@ SELECT '\x80000000'::bytea::int4 AS "-2147483648", '\x7FFFFFFF'::bytea::int4 AS 
 SELECT '\x8000000000000000'::bytea::int8 AS "-9223372036854775808",
        '\x7FFFFFFFFFFFFFFF'::bytea::int8 AS "9223372036854775807";
 
+
+--
+-- reversing a bytea
+--
+SELECT reverse(''::bytea);
+SELECT reverse('\xAA'::bytea);
+SELECT reverse('\xAABBCC'::bytea);
+
 --
 -- test behavior of escape_string_warning and standard_conforming_strings options
 --
