@@ -4154,6 +4154,30 @@ int8_bytea(PG_FUNCTION_ARGS)
 }
 
 /*
+ * Return reversed bytea
+ */
+Datum
+bytea_reverse(PG_FUNCTION_ARGS)
+{
+	bytea	   *v = PG_GETARG_BYTEA_PP(0);
+	int			len = VARSIZE_ANY_EXHDR(v);
+	const char *p = VARDATA_ANY(v);
+	const char *endp = p + len;
+	bytea	   *result;
+	char	   *dst;
+
+	result = palloc(len + VARHDRSZ);
+	dst = (char *) VARDATA(result) + len;
+	SET_VARSIZE(result, len + VARHDRSZ);
+
+	while (p < endp)
+		*(--dst) = *p++;
+
+	PG_RETURN_BYTEA_P(result);
+}
+
+
+/*
  * appendStringInfoText
  *
  * Append a text to str.

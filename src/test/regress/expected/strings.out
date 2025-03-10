@@ -2461,6 +2461,27 @@ SELECT '\x8000000000000000'::bytea::int8 AS "-9223372036854775808",
 (1 row)
 
 --
+-- reversing a bytea
+--
+SELECT reverse(''::bytea);
+ reverse 
+---------
+ \x
+(1 row)
+
+SELECT reverse('\xAA'::bytea);
+ reverse 
+---------
+ \xaa
+(1 row)
+
+SELECT reverse('\xAABBCC'::bytea);
+ reverse  
+----------
+ \xccbbaa
+(1 row)
+
+--
 -- test behavior of escape_string_warning and standard_conforming_strings options
 --
 set escape_string_warning = off;
