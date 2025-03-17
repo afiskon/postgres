@@ -364,8 +364,13 @@ SELECT regexp_split_to_array('thE QUick bROWn FOx jUMPs ovEr The lazy dOG', 'e',
 
 -- E021-11 position expression
 SELECT POSITION('4' IN '1234567890') = '4' AS "4";
-
 SELECT POSITION('5' IN '1234567890') = '5' AS "5";
+
+SELECT POSITION('\x11'::bytea IN ''::bytea) = 0 AS "0";
+SELECT POSITION('\x33'::bytea IN '\x1122'::bytea) = 0 AS "0";
+SELECT POSITION(''::bytea IN '\x1122'::bytea) = 1 AS "1";
+SELECT POSITION('\x22'::bytea IN '\x1122'::bytea) = 2 AS "2";
+SELECT POSITION('\x5678'::bytea IN '\x1234567890'::bytea) = 3 AS "3";
 
 -- T312 character overlay function
 SELECT OVERLAY('abcdef' PLACING '45' FROM 4) AS "abc45f";
@@ -863,10 +868,6 @@ SELECT trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea);
 SELECT btrim(E'\\000trim\\000'::bytea, E'\\000'::bytea);
 SELECT btrim(''::bytea, E'\\000'::bytea);
 SELECT btrim(E'\\000trim\\000'::bytea, ''::bytea);
-SELECT position(''::bytea IN '\x1122'::bytea);
-SELECT position('\x11'::bytea IN ''::bytea);
-SELECT position('\x3344'::bytea IN '\x11223344'::bytea);
-SELECT position('\x5566'::bytea IN '\x11223344'::bytea);
 SELECT encode(overlay(E'Th\\000omas'::bytea placing E'Th\\001omas'::bytea from 2),'escape');
 SELECT encode(overlay(E'Th\\000omas'::bytea placing E'\\002\\003'::bytea from 8),'escape');
 SELECT encode(overlay(E'Th\\000omas'::bytea placing E'\\002\\003'::bytea from 5 for 3),'escape');
