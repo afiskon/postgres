@@ -364,6 +364,7 @@ SELECT regexp_split_to_array('thE QUick bROWn FOx jUMPs ovEr The lazy dOG', 'e',
 
 -- E021-11 position expression
 SELECT POSITION('4' IN '1234567890') = '4' AS "4";
+
 SELECT POSITION('5' IN '1234567890') = '5' AS "5";
 
 SELECT POSITION('\x11'::bytea IN ''::bytea) = 0 AS "0";
