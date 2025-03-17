@@ -1353,6 +1353,36 @@ SELECT POSITION('5' IN '1234567890') = '5' AS "5";
  t
 (1 row)
 
+SELECT POSITION('\x11'::bytea IN ''::bytea) = 0 AS "0";
+ 0 
+---
+ t
+(1 row)
+
+SELECT POSITION('\x33'::bytea IN '\x1122'::bytea) = 0 AS "0";
+ 0 
+---
+ t
+(1 row)
+
+SELECT POSITION(''::bytea IN '\x1122'::bytea) = 1 AS "1";
+ 1 
+---
+ t
+(1 row)
+
+SELECT POSITION('\x22'::bytea IN '\x1122'::bytea) = 2 AS "2";
+ 2 
+---
+ t
+(1 row)
+
+SELECT POSITION('\x5678'::bytea IN '\x1234567890'::bytea) = 3 AS "3";
+ 3 
+---
+ t
+(1 row)
+
 -- T312 character overlay function
 SELECT OVERLAY('abcdef' PLACING '45' FROM 4) AS "abc45f";
  abc45f 
@@ -2748,30 +2778,6 @@ SELECT btrim(E'\\000trim\\000'::bytea, ''::bytea);
     btrim     
 --------------
  \000trim\000
-(1 row)
-
-SELECT position(''::bytea IN '\x1122'::bytea);
- position 
-----------
-        1
-(1 row)
-
-SELECT position('\x11'::bytea IN ''::bytea);
- position 
-----------
-        0
-(1 row)
-
-SELECT position('\x3344'::bytea IN '\x11223344'::bytea);
- position 
-----------
-        3
-(1 row)
-
-SELECT position('\x5566'::bytea IN '\x11223344'::bytea);
- position 
-----------
-        0
 (1 row)
 
 SELECT encode(overlay(E'Th\\000omas'::bytea placing E'Th\\001omas'::bytea from 2),'escape');
