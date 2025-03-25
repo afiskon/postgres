@@ -724,4 +724,91 @@ byteaGetBit(PG_FUNCTION_ARGS)
 		PG_RETURN_INT32(0);
 }
 
+/*-------------------------------------------------------------
+ * byteaSetByte
+ *
+ * Given an instance of type 'bytea' creates a new one with
+ * the Nth byte set to the given value.
+ *
+ *-------------------------------------------------------------
+ */
+Datum
+byteaSetByte(PG_FUNCTION_ARGS)
+{
+	bytea	   *res = PG_GETARG_BYTEA_P_COPY(0);
+	int32		n = PG_GETARG_INT32(1);
+	int32		newByte = PG_GETARG_INT32(2);
+	int			len;
+
+	len = VARSIZE(res) - VARHDRSZ;
+
+	if (n < 0 || n >= len)
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("index %d out of valid range, 0..%d",
+						n, len - 1)));
+
+	/*
+	 * Now set the byte.
+	 */
+	((unsigned char *) VARDATA(res))[n] = newByte;
+
+	PG_RETURN_BYTEA_P(res);
+}
+
+/*-------------------------------------------------------------
+ * byteaSetBit
+ *
+ * Given an instance of type 'bytea' creates a new one with
+ * the Nth bit set to the given value.
+ *
+ *-------------------------------------------------------------
+ */
+Datum
+byteaSetBit(PG_FUNCTION_ARGS)
+{
+	bytea	   *res = PG_GETARG_BYTEA_P_COPY(0);
+	int64		n = PG_GETARG_INT64(1);
+	int32		newBit = PG_GETARG_INT32(2);
+	int			len;
+	int			oldByte,
+				newByte;
+	int			byteNo,
+				bitNo;
+
+	len = VARSIZE(res) - VARHDRSZ;
+
+	if (n < 0 || n >= (int64) len * 8)
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("index %lld out of valid range, 0..%lld",
+						(long long) n, (long long) len * 8 - 1)));
+
+	/* n/8 is now known < len, so safe to cast to int */
+	byteNo = (int) (n / 8);
+	bitNo = (int) (n % 8);
+
+	/*
+	 * sanity check!
+	 */
+	if (newBit != 0 && newBit != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("new bit must be 0 or 1")));
+
+	/*
+	 * Update the byte.
+	 */
+	oldByte = ((unsigned char *) VARDATA(res))[byteNo];
+
+	if (newBit == 0)
+		newByte = oldByte & (~(1 << bitNo));
+	else
+		newByte = oldByte | (1 << bitNo);
+
+	((unsigned char *) VARDATA(res))[byteNo] = newByte;
+
+	PG_RETURN_BYTEA_P(res);
+}
+
 
