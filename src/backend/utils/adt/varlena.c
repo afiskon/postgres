@@ -2657,62 +2657,6 @@ bttext_pattern_sortsupport(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
-/*
- * byteacat -
- *	  takes two bytea* and returns a bytea* that is the concatenation of
- *	  the two.
- *
- * Cloned from textcat and modified as required.
- */
-Datum
-byteacat(PG_FUNCTION_ARGS)
-{
-	bytea	   *t1 = PG_GETARG_BYTEA_PP(0);
-	bytea	   *t2 = PG_GETARG_BYTEA_PP(1);
-
-	PG_RETURN_BYTEA_P(bytea_catenate(t1, t2));
-}
-
-/*
- * bytea_catenate
- *	Guts of byteacat(), broken out so it can be used by other functions
- *
- * Arguments can be in short-header form, but not compressed or out-of-line
- */
-static bytea *
-bytea_catenate(bytea *t1, bytea *t2)
-{
-	bytea	   *result;
-	int			len1,
-				len2,
-				len;
-	char	   *ptr;
-
-	len1 = VARSIZE_ANY_EXHDR(t1);
-	len2 = VARSIZE_ANY_EXHDR(t2);
-
-	/* paranoia ... probably should throw error instead? */
-	if (len1 < 0)
-		len1 = 0;
-	if (len2 < 0)
-		len2 = 0;
-
-	len = len1 + len2 + VARHDRSZ;
-	result = (bytea *) palloc(len);
-
-	/* Set size of result string... */
-	SET_VARSIZE(result, len);
-
-	/* Fill data field of result string... */
-	ptr = VARDATA(result);
-	if (len1 > 0)
-		memcpy(ptr, VARDATA_ANY(t1), len1);
-	if (len2 > 0)
-		memcpy(ptr + len1, VARDATA_ANY(t2), len2);
-
-	return result;
-}
-
 #define PG_STR_GET_BYTEA(str_) \
 	DatumGetByteaPP(DirectFunctionCall1(byteain, CStringGetDatum(str_)))
 
