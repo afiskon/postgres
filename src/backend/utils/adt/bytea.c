@@ -48,6 +48,7 @@
  *****************************************************************************/
 
 #define VAL(CH)			((CH) - '0')
+#define DIG(VAL)		((VAL) + '0')
 
 /*
  *		byteain			- converts from printable representation of byte array
@@ -150,6 +151,92 @@ byteain(PG_FUNCTION_ARGS)
 	}
 
 	PG_RETURN_BYTEA_P(result);
+}
+
+/*
+ *		byteaout		- converts to printable representation of byte array
+ *
+ *		In the traditional escaped format, non-printable characters are
+ *		printed as '\nnn' (octal) and '\' as '\\'.
+ */
+Datum
+byteaout(PG_FUNCTION_ARGS)
+{
+	bytea	   *vlena = PG_GETARG_BYTEA_PP(0);
+	char	   *result;
+	char	   *rp;
+
+	if (bytea_output == BYTEA_OUTPUT_HEX)
+	{
+		/* Print hex format */
+		rp = result = palloc(VARSIZE_ANY_EXHDR(vlena) * 2 + 2 + 1);
+		*rp++ = '\\';
+		*rp++ = 'x';
+		rp += hex_encode(VARDATA_ANY(vlena), VARSIZE_ANY_EXHDR(vlena), rp);
+	}
+	else if (bytea_output == BYTEA_OUTPUT_ESCAPE)
+	{
+		/* Print traditional escaped format */
+		char	   *vp;
+		uint64		len;
+		int			i;
+
+		len = 1;				/* empty string has 1 char */
+		vp = VARDATA_ANY(vlena);
+		for (i = VARSIZE_ANY_EXHDR(vlena); i != 0; i--, vp++)
+		{
+			if (*vp == '\\')
+				len += 2;
+			else if ((unsigned char) *vp < 0x20 || (unsigned char) *vp > 0x7e)
+				len += 4;
+			else
+				len++;
+		}
+
+		/*
+		 * In principle len can't overflow uint32 if the input fit in 1GB, but
+		 * for safety let's check rather than relying on palloc's internal
+		 * check.
+		 */
+		if (len > MaxAllocSize)
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+					 errmsg_internal("result of bytea output conversion is too large")));
+		rp = result = (char *) palloc(len);
+
+		vp = VARDATA_ANY(vlena);
+		for (i = VARSIZE_ANY_EXHDR(vlena); i != 0; i--, vp++)
+		{
+			if (*vp == '\\')
+			{
+				*rp++ = '\\';
+				*rp++ = '\\';
+			}
+			else if ((unsigned char) *vp < 0x20 || (unsigned char) *vp > 0x7e)
+			{
+				int			val;	/* holds unprintable chars */
+
+				val = *vp;
+				rp[0] = '\\';
+				rp[3] = DIG(val & 07);
+				val >>= 3;
+				rp[2] = DIG(val & 07);
+				val >>= 3;
+				rp[1] = DIG(val & 03);
+				rp += 4;
+			}
+			else
+				*rp++ = *vp;
+		}
+	}
+	else
+	{
+		elog(ERROR, "unrecognized \"bytea_output\" setting: %d",
+			 bytea_output);
+		rp = result = NULL;		/* keep compiler quiet */
+	}
+	*rp = '\0';
+	PG_RETURN_CSTRING(result);
 }
 
 
