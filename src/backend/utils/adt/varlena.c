@@ -2651,49 +2651,6 @@ bttext_pattern_sortsupport(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
-/*
- * byteapos -
- *	  Return the position of the specified substring.
- *	  Implements the SQL POSITION() function.
- * Cloned from textpos and modified as required.
- */
-Datum
-byteapos(PG_FUNCTION_ARGS)
-{
-	bytea	   *t1 = PG_GETARG_BYTEA_PP(0);
-	bytea	   *t2 = PG_GETARG_BYTEA_PP(1);
-	int			pos;
-	int			px,
-				p;
-	int			len1,
-				len2;
-	char	   *p1,
-			   *p2;
-
-	len1 = VARSIZE_ANY_EXHDR(t1);
-	len2 = VARSIZE_ANY_EXHDR(t2);
-
-	if (len2 <= 0)
-		PG_RETURN_INT32(1);		/* result for empty pattern */
-
-	p1 = VARDATA_ANY(t1);
-	p2 = VARDATA_ANY(t2);
-
-	pos = 0;
-	px = (len1 - len2);
-	for (p = 0; p <= px; p++)
-	{
-		if ((*p2 == *p1) && (memcmp(p1, p2, len2) == 0))
-		{
-			pos = p + 1;
-			break;
-		};
-		p1++;
-	};
-
-	PG_RETURN_INT32(pos);
-}
-
 /*-------------------------------------------------------------
  * byteaGetByte
  *
