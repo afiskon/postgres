@@ -832,4 +832,232 @@ bytea_reverse(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(result);
 }
 
+/*****************************************************************************
+ *	Comparison Functions used for bytea
+ *
+ * Note: btree indexes need these routines not to leak memory; therefore,
+ * be careful to free working copies of toasted datums.  Most places don't
+ * need to be so careful.
+ *****************************************************************************/
+
+Datum
+byteaeq(PG_FUNCTION_ARGS)
+{
+	Datum		arg1 = PG_GETARG_DATUM(0);
+	Datum		arg2 = PG_GETARG_DATUM(1);
+	bool		result;
+	Size		len1,
+				len2;
+
+	/*
+	 * We can use a fast path for unequal lengths, which might save us from
+	 * having to detoast one or both values.
+	 */
+	len1 = toast_raw_datum_size(arg1);
+	len2 = toast_raw_datum_size(arg2);
+	if (len1 != len2)
+		result = false;
+	else
+	{
+		bytea	   *barg1 = DatumGetByteaPP(arg1);
+		bytea	   *barg2 = DatumGetByteaPP(arg2);
+
+		result = (memcmp(VARDATA_ANY(barg1), VARDATA_ANY(barg2),
+						 len1 - VARHDRSZ) == 0);
+
+		PG_FREE_IF_COPY(barg1, 0);
+		PG_FREE_IF_COPY(barg2, 1);
+	}
+
+	PG_RETURN_BOOL(result);
+}
+
+Datum
+byteane(PG_FUNCTION_ARGS)
+{
+	Datum		arg1 = PG_GETARG_DATUM(0);
+	Datum		arg2 = PG_GETARG_DATUM(1);
+	bool		result;
+	Size		len1,
+				len2;
+
+	/*
+	 * We can use a fast path for unequal lengths, which might save us from
+	 * having to detoast one or both values.
+	 */
+	len1 = toast_raw_datum_size(arg1);
+	len2 = toast_raw_datum_size(arg2);
+	if (len1 != len2)
+		result = true;
+	else
+	{
+		bytea	   *barg1 = DatumGetByteaPP(arg1);
+		bytea	   *barg2 = DatumGetByteaPP(arg2);
+
+		result = (memcmp(VARDATA_ANY(barg1), VARDATA_ANY(barg2),
+						 len1 - VARHDRSZ) != 0);
+
+		PG_FREE_IF_COPY(barg1, 0);
+		PG_FREE_IF_COPY(barg2, 1);
+	}
+
+	PG_RETURN_BOOL(result);
+}
+
+Datum
+bytealt(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+
+	PG_FREE_IF_COPY(arg1, 0);
+	PG_FREE_IF_COPY(arg2, 1);
+
+	PG_RETURN_BOOL((cmp < 0) || ((cmp == 0) && (len1 < len2)));
+}
+
+Datum
+byteale(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+
+	PG_FREE_IF_COPY(arg1, 0);
+	PG_FREE_IF_COPY(arg2, 1);
+
+	PG_RETURN_BOOL((cmp < 0) || ((cmp == 0) && (len1 <= len2)));
+}
+
+Datum
+byteagt(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+
+	PG_FREE_IF_COPY(arg1, 0);
+	PG_FREE_IF_COPY(arg2, 1);
+
+	PG_RETURN_BOOL((cmp > 0) || ((cmp == 0) && (len1 > len2)));
+}
+
+Datum
+byteage(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+
+	PG_FREE_IF_COPY(arg1, 0);
+	PG_FREE_IF_COPY(arg2, 1);
+
+	PG_RETURN_BOOL((cmp > 0) || ((cmp == 0) && (len1 >= len2)));
+}
+
+Datum
+byteacmp(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+	if ((cmp == 0) && (len1 != len2))
+		cmp = (len1 < len2) ? -1 : 1;
+
+	PG_FREE_IF_COPY(arg1, 0);
+	PG_FREE_IF_COPY(arg2, 1);
+
+	PG_RETURN_INT32(cmp);
+}
+
+Datum
+bytea_larger(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	bytea	   *result;
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+	result = ((cmp > 0) || ((cmp == 0) && (len1 > len2)) ? arg1 : arg2);
+
+	PG_RETURN_BYTEA_P(result);
+}
+
+Datum
+bytea_smaller(PG_FUNCTION_ARGS)
+{
+	bytea	   *arg1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *arg2 = PG_GETARG_BYTEA_PP(1);
+	bytea	   *result;
+	int			len1,
+				len2;
+	int			cmp;
+
+	len1 = VARSIZE_ANY_EXHDR(arg1);
+	len2 = VARSIZE_ANY_EXHDR(arg2);
+
+	cmp = memcmp(VARDATA_ANY(arg1), VARDATA_ANY(arg2), Min(len1, len2));
+	result = ((cmp < 0) || ((cmp == 0) && (len1 < len2)) ? arg1 : arg2);
+
+	PG_RETURN_BYTEA_P(result);
+}
+
+Datum
+bytea_sortsupport(PG_FUNCTION_ARGS)
+{
+	SortSupport ssup = (SortSupport) PG_GETARG_POINTER(0);
+	MemoryContext oldcontext;
+
+	oldcontext = MemoryContextSwitchTo(ssup->ssup_cxt);
+
+	/* Use generic string SortSupport, forcing "C" collation */
+	varstr_sortsupport(ssup, BYTEAOID, C_COLLATION_OID);
+
+	MemoryContextSwitchTo(oldcontext);
+
+	PG_RETURN_VOID();
+}
+
 
