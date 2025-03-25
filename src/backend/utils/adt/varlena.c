@@ -2652,34 +2652,6 @@ bttext_pattern_sortsupport(PG_FUNCTION_ARGS)
 }
 
 /*-------------------------------------------------------------
- * byteaGetByte
- *
- * this routine treats "bytea" as an array of bytes.
- * It returns the Nth byte (a number between 0 and 255).
- *-------------------------------------------------------------
- */
-Datum
-byteaGetByte(PG_FUNCTION_ARGS)
-{
-	bytea	   *v = PG_GETARG_BYTEA_PP(0);
-	int32		n = PG_GETARG_INT32(1);
-	int			len;
-	int			byte;
-
-	len = VARSIZE_ANY_EXHDR(v);
-
-	if (n < 0 || n >= len)
-		ereport(ERROR,
-				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
-				 errmsg("index %d out of valid range, 0..%d",
-						n, len - 1)));
-
-	byte = ((unsigned char *) VARDATA_ANY(v))[n];
-
-	PG_RETURN_INT32(byte);
-}
-
-/*-------------------------------------------------------------
  * byteaGetBit
  *
  * This routine treats a "bytea" type like an array of bits.
