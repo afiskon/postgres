@@ -38,7 +38,7 @@
 #include "utils/bytea.h"
 ///#include "utils/guc.h"
 ////#include "utils/lsyscache.h"
-#include "utils/memutils.h"
+////#include "utils/memutils.h"
 //#include "utils/pg_locale.h"
 ///#include "utils/sortsupport.h"
 //#include "utils/varlena.h"
