@@ -108,6 +108,35 @@ bytea_catenate(bytea *t1, bytea *t2)
 	return result;
 }
 
+static bytea *
+bytea_overlay(bytea *t1, bytea *t2, int sp, int sl)
+{
+	bytea	   *result;
+	bytea	   *s1;
+	bytea	   *s2;
+	int			sp_pl_sl;
+
+	/*
+	 * Check for possible integer-overflow cases.  For negative sp, throw a
+	 * "substring length" error because that's what should be expected
+	 * according to the spec's definition of OVERLAY().
+	 */
+	if (sp <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_SUBSTRING_ERROR),
+				 errmsg("negative substring length not allowed")));
+	if (pg_add_s32_overflow(sp, sl, &sp_pl_sl))
+		ereport(ERROR,
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+				 errmsg("integer out of range")));
+
+	s1 = bytea_substring(PointerGetDatum(t1), 1, sp - 1, false);
+	s2 = bytea_substring(PointerGetDatum(t1), sp_pl_sl, -1, true);
+	result = bytea_catenate(s1, t2);
+	result = bytea_catenate(result, s2);
+
+	return result;
+}
 
 /*****************************************************************************
  *	 USER I/O ROUTINES														 *
@@ -442,6 +471,36 @@ byteacat(PG_FUNCTION_ARGS)
 	bytea	   *t2 = PG_GETARG_BYTEA_PP(1);
 
 	PG_RETURN_BYTEA_P(bytea_catenate(t1, t2));
+}
+
+/*
+ * byteaoverlay
+ *	Replace specified substring of first string with second
+ *
+ * The SQL standard defines OVERLAY() in terms of substring and concatenation.
+ * This code is a direct implementation of what the standard says.
+ */
+Datum
+byteaoverlay(PG_FUNCTION_ARGS)
+{
+	bytea	   *t1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *t2 = PG_GETARG_BYTEA_PP(1);
+	int			sp = PG_GETARG_INT32(2);	/* substring start position */
+	int			sl = PG_GETARG_INT32(3);	/* substring length */
+
+	PG_RETURN_BYTEA_P(bytea_overlay(t1, t2, sp, sl));
+}
+
+Datum
+byteaoverlay_no_len(PG_FUNCTION_ARGS)
+{
+	bytea	   *t1 = PG_GETARG_BYTEA_PP(0);
+	bytea	   *t2 = PG_GETARG_BYTEA_PP(1);
+	int			sp = PG_GETARG_INT32(2);	/* substring start position */
+	int			sl;
+
+	sl = VARSIZE_ANY_EXHDR(t2); /* defaults to length(t2) */
+	PG_RETURN_BYTEA_P(bytea_overlay(t1, t2, sp, sl));
 }
 
 
