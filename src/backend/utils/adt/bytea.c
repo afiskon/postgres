@@ -43,6 +43,9 @@
 ///#include "utils/sortsupport.h"
 #include "utils/varlena.h"
 
+/* GUC variable */
+int			bytea_output = BYTEA_OUTPUT_HEX;
+
 /* subroutine to initialize state */
 static StringInfo
 makeStringAggState(FunctionCallInfo fcinfo)

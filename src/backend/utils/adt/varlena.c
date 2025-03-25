@@ -43,10 +43,6 @@
 #include "utils/sortsupport.h"
 #include "utils/varlena.h"
 
-
-/* GUC variable */
-int			bytea_output = BYTEA_OUTPUT_HEX;
-
 typedef struct varlena VarString;
 
 /*
