@@ -17,15 +17,15 @@
 //#include <ctype.h>
 //#include <limits.h>
 
-#include "access/detoast.h"
-#include "access/toast_compression.h"
-#include "catalog/pg_collation.h"
-#include "catalog/pg_type.h"
-#include "common/hashfn.h"
-#include "common/int.h"
-#include "common/unicode_category.h"
-#include "common/unicode_norm.h"
-#include "common/unicode_version.h"
+//#include "access/detoast.h"
+//#include "access/toast_compression.h"
+//#include "catalog/pg_collation.h"
+//#include "catalog/pg_type.h"
+//#include "common/hashfn.h"
+//#include "common/int.h"
+//#include "common/unicode_category.h"
+//#include "common/unicode_norm.h"
+//#include "common/unicode_version.h"
 #include "funcapi.h"
 #include "lib/hyperloglog.h"
 #include "libpq/pqformat.h"
@@ -33,15 +33,15 @@
 #include "nodes/execnodes.h"
 #include "parser/scansup.h"
 #include "port/pg_bswap.h"
-#include "regex/regex.h"
+//#include "regex/regex.h"
 #include "utils/builtins.h"
 #include "utils/bytea.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
-#include "utils/pg_locale.h"
+//#include "utils/pg_locale.h"
 #include "utils/sortsupport.h"
-#include "utils/varlena.h"
+//#include "utils/varlena.h"
 
 
 /* GUC variable */
