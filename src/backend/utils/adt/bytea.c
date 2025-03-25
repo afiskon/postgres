@@ -108,6 +108,69 @@ bytea_catenate(bytea *t1, bytea *t2)
 	return result;
 }
 
+#define PG_STR_GET_BYTEA(str_) \
+	DatumGetByteaPP(DirectFunctionCall1(byteain, CStringGetDatum(str_)))
+
+static bytea *
+bytea_substring(Datum str,
+				int S,
+				int L,
+				bool length_not_specified)
+{
+	int32		S1;				/* adjusted start position */
+	int32		L1;				/* adjusted substring length */
+	int32		E;				/* end position */
+
+	/*
+	 * The logic here should generally match text_substring().
+	 */
+	S1 = Max(S, 1);
+
+	if (length_not_specified)
+	{
+		/*
+		 * Not passed a length - DatumGetByteaPSlice() grabs everything to the
+		 * end of the string if we pass it a negative value for length.
+		 */
+		L1 = -1;
+	}
+	else if (L < 0)
+	{
+		/* SQL99 says to throw an error for E < S, i.e., negative length */
+		ereport(ERROR,
+				(errcode(ERRCODE_SUBSTRING_ERROR),
+				 errmsg("negative substring length not allowed")));
+		L1 = -1;				/* silence stupider compilers */
+	}
+	else if (pg_add_s32_overflow(S, L, &E))
+	{
+		/*
+		 * L could be large enough for S + L to overflow, in which case the
+		 * substring must run to end of string.
+		 */
+		L1 = -1;
+	}
+	else
+	{
+		/*
+		 * A zero or negative value for the end position can happen if the
+		 * start was negative or one. SQL99 says to return a zero-length
+		 * string.
+		 */
+		if (E < 1)
+			return PG_STR_GET_BYTEA("");
+
+		L1 = E - S1;
+	}
+
+	/*
+	 * If the start position is past the end of the string, SQL99 says to
+	 * return a zero-length string -- DatumGetByteaPSlice() will do that for
+	 * us.  We need only convert S1 to zero-based starting position.
+	 */
+	return DatumGetByteaPSlice(str, S1 - 1, L1);
+}
+
 static bytea *
 bytea_overlay(bytea *t1, bytea *t2, int sp, int sl)
 {
@@ -501,6 +564,44 @@ byteaoverlay_no_len(PG_FUNCTION_ARGS)
 
 	sl = VARSIZE_ANY_EXHDR(t2); /* defaults to length(t2) */
 	PG_RETURN_BYTEA_P(bytea_overlay(t1, t2, sp, sl));
+}
+
+/*
+ * bytea_substr()
+ * Return a substring starting at the specified position.
+ * Cloned from text_substr and modified as required.
+ *
+ * Input:
+ *	- string
+ *	- starting position (is one-based)
+ *	- string length (optional)
+ *
+ * If the starting position is zero or less, then return from the start of the string
+ * adjusting the length to be consistent with the "negative start" per SQL.
+ * If the length is less than zero, an ERROR is thrown. If no third argument
+ * (length) is provided, the length to the end of the string is assumed.
+ */
+Datum
+bytea_substr(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_BYTEA_P(bytea_substring(PG_GETARG_DATUM(0),
+									  PG_GETARG_INT32(1),
+									  PG_GETARG_INT32(2),
+									  false));
+}
+
+/*
+ * bytea_substr_no_len -
+ *	  Wrapper to avoid opr_sanity failure due to
+ *	  one function accepting a different number of args.
+ */
+Datum
+bytea_substr_no_len(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_BYTEA_P(bytea_substring(PG_GETARG_DATUM(0),
+									  PG_GETARG_INT32(1),
+									  -1,
+									  true));
 }
 
 
