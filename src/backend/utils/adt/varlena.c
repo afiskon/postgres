@@ -14,8 +14,8 @@
  */
 #include "postgres.h"
 
-#include <ctype.h>
-#include <limits.h>
+//#include <ctype.h>
+//#include <limits.h>
 
 #include "access/detoast.h"
 #include "access/toast_compression.h"
