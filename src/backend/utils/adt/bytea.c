@@ -43,6 +43,31 @@
 ///#include "utils/sortsupport.h"
 //#include "utils/varlena.h"
 
+/* subroutine to initialize state */
+static StringInfo
+makeStringAggState(FunctionCallInfo fcinfo)
+{
+	StringInfo	state;
+	MemoryContext aggcontext;
+	MemoryContext oldcontext;
+
+	if (!AggCheckCallContext(fcinfo, &aggcontext))
+	{
+		/* cannot be called directly because of internal-type argument */
+		elog(ERROR, "bytea_string_agg_transfn called in non-aggregate context");
+	}
+
+	/*
+	 * Create state in aggregate context.  It'll stay there across subsequent
+	 * calls.
+	 */
+	oldcontext = MemoryContextSwitchTo(aggcontext);
+	state = makeStringInfo();
+	MemoryContextSwitchTo(oldcontext);
+
+	return state;
+}
+
 /*****************************************************************************
  *	 USER I/O ROUTINES														 *
  *****************************************************************************/
