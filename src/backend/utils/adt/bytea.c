@@ -686,4 +686,42 @@ byteaGetByte(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(byte);
 }
 
+/*-------------------------------------------------------------
+ * byteaGetBit
+ *
+ * This routine treats a "bytea" type like an array of bits.
+ * It returns the value of the Nth bit (0 or 1).
+ *
+ *-------------------------------------------------------------
+ */
+Datum
+byteaGetBit(PG_FUNCTION_ARGS)
+{
+	bytea	   *v = PG_GETARG_BYTEA_PP(0);
+	int64		n = PG_GETARG_INT64(1);
+	int			byteNo,
+				bitNo;
+	int			len;
+	int			byte;
+
+	len = VARSIZE_ANY_EXHDR(v);
+
+	if (n < 0 || n >= (int64) len * 8)
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("index %lld out of valid range, 0..%lld",
+						(long long) n, (long long) len * 8 - 1)));
+
+	/* n/8 is now known < len, so safe to cast to int */
+	byteNo = (int) (n / 8);
+	bitNo = (int) (n % 8);
+
+	byte = ((unsigned char *) VARDATA_ANY(v))[byteNo];
+
+	if (byte & (1 << bitNo))
+		PG_RETURN_INT32(1);
+	else
+		PG_RETURN_INT32(0);
+}
+
 
