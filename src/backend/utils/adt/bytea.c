@@ -26,7 +26,7 @@
 //#include "common/unicode_category.h"
 //#include "common/unicode_norm.h"
 //#include "common/unicode_version.h"
-#include "funcapi.h"
+////#include "funcapi.h"
 ///#include "lib/hyperloglog.h"
 ///#include "libpq/pqformat.h"
 ///#include "miscadmin.h"
