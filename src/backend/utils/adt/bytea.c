@@ -46,6 +46,16 @@
 /* GUC variable */
 int			bytea_output = BYTEA_OUTPUT_HEX;
 
+static StringInfo
+makeStringAggState(FunctionCallInfo fcinfo);
+static bytea *
+bytea_catenate(bytea *t1, bytea *t2);
+static bytea *
+bytea_substring(Datum str, int S, int L, bool length_not_specified);
+static bytea *
+bytea_overlay(bytea *t1, bytea *t2, int sp, int sl);
+
+
 /* subroutine to initialize state */
 static StringInfo
 makeStringAggState(FunctionCallInfo fcinfo)
