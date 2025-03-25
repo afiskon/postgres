@@ -279,36 +279,6 @@ text_to_cstring_buffer(const text *src, char *dst, size_t dst_len)
  *	 USER I/O ROUTINES														 *
  *****************************************************************************/
 
-/*
- *		bytearecv			- converts external binary format to bytea
- */
-Datum
-bytearecv(PG_FUNCTION_ARGS)
-{
-	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	bytea	   *result;
-	int			nbytes;
-
-	nbytes = buf->len - buf->cursor;
-	result = (bytea *) palloc(nbytes + VARHDRSZ);
-	SET_VARSIZE(result, nbytes + VARHDRSZ);
-	pq_copymsgbytes(buf, VARDATA(result), nbytes);
-	PG_RETURN_BYTEA_P(result);
-}
-
-/*
- *		byteasend			- converts bytea to binary format
- *
- * This is a special case: just copy the input...
- */
-Datum
-byteasend(PG_FUNCTION_ARGS)
-{
-	bytea	   *vlena = PG_GETARG_BYTEA_P_COPY(0);
-
-	PG_RETURN_BYTEA_P(vlena);
-}
-
 Datum
 bytea_string_agg_transfn(PG_FUNCTION_ARGS)
 {
