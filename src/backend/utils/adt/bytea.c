@@ -19,7 +19,7 @@
 
 #include "access/detoast.h"
 //#include "access/toast_compression.h"
-//#include "catalog/pg_collation.h"
+#include "catalog/pg_collation.h"
 ///#include "catalog/pg_type.h"
 ///#include "common/hashfn.h"
 #include "common/int.h"
