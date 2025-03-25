@@ -372,4 +372,19 @@ bytea_string_agg_finalfn(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 }
 
+/*-------------------------------------------------------------
+ * byteaoctetlen
+ *
+ * get the number of bytes contained in an instance of type 'bytea'
+ *-------------------------------------------------------------
+ */
+Datum
+byteaoctetlen(PG_FUNCTION_ARGS)
+{
+	Datum		str = PG_GETARG_DATUM(0);
+
+	/* We need not detoast the input at all */
+	PG_RETURN_INT32(toast_raw_datum_size(str) - VARHDRSZ);
+}
+
 

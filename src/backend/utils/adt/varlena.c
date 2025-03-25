@@ -2657,22 +2657,6 @@ bttext_pattern_sortsupport(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
-
-/*-------------------------------------------------------------
- * byteaoctetlen
- *
- * get the number of bytes contained in an instance of type 'bytea'
- *-------------------------------------------------------------
- */
-Datum
-byteaoctetlen(PG_FUNCTION_ARGS)
-{
-	Datum		str = PG_GETARG_DATUM(0);
-
-	/* We need not detoast the input at all */
-	PG_RETURN_INT32(toast_raw_datum_size(str) - VARHDRSZ);
-}
-
 /*
  * byteacat -
  *	  takes two bytea* and returns a bytea* that is the concatenation of
