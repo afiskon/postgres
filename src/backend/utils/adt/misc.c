@@ -29,6 +29,7 @@
 #include "commands/dbcommands.h"
 #include "commands/tablespace.h"
 #include "common/keywords.h"
+#include "common/pg_prng.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/miscnodes.h"
@@ -562,15 +563,17 @@ typedef struct
 	HeapTuple  *reservoir;
 	uint32		reservoir_size;
 	uint32		seen;
-}			SampleSrfState;
+} SampleSrfState;
 
+/* XXX add comments and SGML docs */
 Datum
 sample_srf(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	SampleSrfState *state;
-	HeapTupleHeader input_tuple;
+	HeapTupleHeader in_tuple;
 	TupleDesc	tupdesc;
+	int32 ntuples;
 
 	/* XXX support NULLs as well */
 	if (PG_NARGS() != 2 || PG_ARGISNULL(0) || PG_ARGISNULL(1))
@@ -580,8 +583,7 @@ sample_srf(PG_FUNCTION_ARGS)
 				 errmsg("sample() requires two non-null arguments")));
 	}
 
-	int32		ntuples = PG_GETARG_INT32(1);
-
+	ntuples = PG_GETARG_INT32(1);
 	if (ntuples <= 0)
 	{
 		ereport(ERROR,
@@ -615,17 +617,14 @@ sample_srf(PG_FUNCTION_ARGS)
 	}
 
 	/* get another tuple */
-	input_tuple = PG_GETARG_HEAPTUPLEHEADER(0);
+	in_tuple = PG_GETARG_HEAPTUPLEHEADER(0);
 	state = (SampleSrfState *) funcctx->user_fctx;
 
 	/* reservoir sampling */
 	if (state->seen < state->reservoir_size)
 	{
 		/* save first N tuples */
-		state->reservoir[state->seen] = heap_copy_tuple_from_heaptuple(
-																	   GetPerTupleMemoryContext(fcinfo),
-																	   (HeapTuple) input_tuple
-			);
+		state->reservoir[state->seen] = heap_copytuple((HeapTuple) in_tuple);
 	}
 	else
 	{
@@ -636,15 +635,12 @@ sample_srf(PG_FUNCTION_ARGS)
 		{
 			/* Replace random sample */
 			heap_freetuple(state->reservoir[r]);
-			state->reservoir[r] = heap_copy_tuple_from_heaptuple(
-																 GetPerTupleMemoryContext(fcinfo),
-																 (HeapTuple) input_tuple
-				);
+			state->reservoir[r] = heap_copytuple((HeapTuple) in_tuple);
 		}
 	}
 	state->seen++;
 
-	if (SRF_IS_LASTCALL())
+	if ( false /* SRF_IS_LASTCALL() */ ) // XXX there is no such thing
 	{
 		for (uint32 i = 0; i < state->reservoir_size && i < state->seen; i++)
 		{
