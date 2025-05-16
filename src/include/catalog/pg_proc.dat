@@ -8641,6 +8641,10 @@
 { oid => '8402', descr => 'planner support for generate_series',
   proname => 'generate_series_timestamp_support', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'generate_series_timestamp_support' },
+{ oid => '8786', descr => 'sample up to given amount of rows',
+  proname => 'sample', prorettype => 'internal',
+  proargtypes => 'internal', prosrc => 'sample_srf' },
+
 
 # boolean aggregates
 { oid => '2515', descr => 'aggregate transition function',
