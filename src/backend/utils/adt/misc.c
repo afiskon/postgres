@@ -556,88 +556,102 @@ pg_get_catalog_foreign_keys(PG_FUNCTION_ARGS)
 	SRF_RETURN_DONE(funcctx);
 }
 
-typedef struct {
-    HeapTuple *reservoir; 
-    uint32 reservoir_size;
-    uint32 seen;
-} SampleSrfState;
+typedef struct
+{
+	HeapTuple  *reservoir;
+	uint32		reservoir_size;
+	uint32		seen;
+}			SampleSrfState;
 
 Datum
-sample_srf(PG_FUNCTION_ARGS) {
-    FuncCallContext *funcctx;
-    RandomSampleState *state;
-    HeapTupleHeader input_tuple;
-    TupleDesc tupdesc;
+sample_srf(PG_FUNCTION_ARGS)
+{
+	FuncCallContext *funcctx;
+	RandomSampleState *state;
+	HeapTupleHeader input_tuple;
+	TupleDesc	tupdesc;
 
 	/* XXX support NULLs as well */
-    if (PG_NARGS() != 2 || PG_ARGISNULL(0) || PG_ARGISNULL(1)) {
-        ereport(ERROR,
-                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("sample() requires two non-null arguments"))); 
-    }
+	if (PG_NARGS() != 2 || PG_ARGISNULL(0) || PG_ARGISNULL(1))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("sample() requires two non-null arguments")));
+	}
 
-    int32 ntuples = PG_GETARG_INT32(1);
-    if (ntuples <= 0) {
-        ereport(ERROR,
-                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("ntuples must be a positive number")));
-    }
+	int32		ntuples = PG_GETARG_INT32(1);
 
-    if (SRF_IS_FIRSTCALL()) {
-        MemoryContext oldcontext;
-        
-        if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE) {
-            ereport(ERROR,
-                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                     errmsg("sample() must accept a composite type argument")));
-        }
+	if (ntuples <= 0)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("ntuples must be a positive number")));
+	}
 
-        funcctx = SRF_FIRSTCALL_INIT();
-        oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
 
-        state = (SampleSrfState *) palloc(sizeof(SampleSrfState));
-        state->reservoir = (HeapTuple *) palloc0(sizeof(HeapTuple) * ntuples);
-        state->reservoir_size = ntuples;
-        state->seen = 0;
+		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("sample() must accept a composite type argument")));
+		}
 
-        funcctx->user_fctx = state;
-        funcctx->tuple_desc = tupdesc;
+		funcctx = SRF_FIRSTCALL_INIT();
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-        MemoryContextSwitchTo(oldcontext);
-    }
+		state = (SampleSrfState *) palloc(sizeof(SampleSrfState));
+		state->reservoir = (HeapTuple *) palloc0(sizeof(HeapTuple) * ntuples);
+		state->reservoir_size = ntuples;
+		state->seen = 0;
+
+		funcctx->user_fctx = state;
+		funcctx->tuple_desc = tupdesc;
+
+		MemoryContextSwitchTo(oldcontext);
+	}
 
 	/* get another tuple */
-    input_tuple = PG_GETARG_HEAPTUPLEHEADER(0);
-    state = (SampleSrfState *) funcctx->user_fctx;
+	input_tuple = PG_GETARG_HEAPTUPLEHEADER(0);
+	state = (SampleSrfState *) funcctx->user_fctx;
 
-    /* reservoir sampling */
-    if (state->seen < state->reservoir_size) {
+	/* reservoir sampling */
+	if (state->seen < state->reservoir_size)
+	{
 		/* save first N tuples */
-        state->reservoir[state->seen] = heap_copy_tuple_from_heaptuple(
-            GetPerTupleMemoryContext(fcinfo),
-            (HeapTuple) input_tuple
-        );
-    } else {
+		state->reservoir[state->seen] = heap_copy_tuple_from_heaptuple(
+																	   GetPerTupleMemoryContext(fcinfo),
+																	   (HeapTuple) input_tuple
+			);
+	}
+	else
+	{
 		/* decide whether to include another tuple to the reservoir */
-        uint32 r = pg_prng_uint32(&pg_global_prng_state) % (state->seen + 1);
-        if (r < state->reservoir_size) {
+		uint32		r = pg_prng_uint32(&pg_global_prng_state) % (state->seen + 1);
+
+		if (r < state->reservoir_size)
+		{
 			/* Replace random sample */
-            heap_freetuple(state->reservoir[r]);
-            state->reservoir[r] = heap_copy_tuple_from_heaptuple(
-                GetPerTupleMemoryContext(fcinfo),
-                (HeapTuple) input_tuple
-            );
-        }
-    }
-    state->seen++;
+			heap_freetuple(state->reservoir[r]);
+			state->reservoir[r] = heap_copy_tuple_from_heaptuple(
+																 GetPerTupleMemoryContext(fcinfo),
+																 (HeapTuple) input_tuple
+				);
+		}
+	}
+	state->seen++;
 
-    if (SRF_IS_LASTCALL()) {
-        for (uint32 i = 0; i < state->reservoir_size && i < state->seen; i++) {
-            SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(state->reservoir[i]));
-        }
-    }
+	if (SRF_IS_LASTCALL())
+	{
+		for (uint32 i = 0; i < state->reservoir_size && i < state->seen; i++)
+		{
+			SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(state->reservoir[i]));
+		}
+	}
 
-    SRF_RETURN_DONE(funcctx);
+	SRF_RETURN_DONE(funcctx);
 }
 
 
