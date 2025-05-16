@@ -556,6 +556,7 @@ pg_get_catalog_foreign_keys(PG_FUNCTION_ARGS)
 	SRF_RETURN_DONE(funcctx);
 }
 
+/* XXX move elsewhere */
 typedef struct
 {
 	HeapTuple  *reservoir;
@@ -567,7 +568,7 @@ Datum
 sample_srf(PG_FUNCTION_ARGS)
 {
 	FuncCallContext *funcctx;
-	RandomSampleState *state;
+	SampleSrfState *state;
 	HeapTupleHeader input_tuple;
 	TupleDesc	tupdesc;
 
