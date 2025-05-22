@@ -1390,9 +1390,7 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	/* Реализация алгоритма reservoir sampling */
 	if (state->processed < state->nsamples)
 	{
-		/*
-		 * Первые nsamples элементов добавляем напрямую
-		 */
+		/* Первые nsamples элементов добавляем напрямую */
 		state->samples = accumArrayResult(state->samples,
 										  elem,
 										  isNull,
@@ -1401,13 +1399,13 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/*
-		 * Для следующих элементов используем вероятностный алгоритм
-		 */
-		int64		j = (int64) (((double) state->nsamples) * random() / ((double) MAX_RANDOM_VALUE + 1));
-
-		if (j < state->nsamples)
+		/* Для следующих элементов используем вероятностный алгоритм */
+		/* Генерируем случайное число [0, 1) и проверяем вероятность включения элемента */
+		if (pg_prng_double(&pg_global_prng_state) < (double) state->nsamples / (double) (state->processed + 1))
 		{
+			/* Выбираем случайный элемент из резервуара для замены */
+			int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state->nsamples - 1);
+
 			/*
 			 * Заменяем элемент j на новый элемент
 			 */
@@ -1555,10 +1553,12 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 			 * Иначе добавляем с вероятностью
 			 * nsamples / processed
 			 */
-			int64		j = (int64) (((double) state1->nsamples) * random() / ((double) MAX_RANDOM_VALUE + 1));
-
-			if (j < state1->nsamples)
+			/* Генерируем случайное число [0, 1) и проверяем вероятность включения элемента */
+			if (pg_prng_double(&pg_global_prng_state) < (double) state1->nsamples / (double) (state1->processed + 1))
 			{
+				/* Выбираем случайный элемент из резервуара для замены */
+				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
+
 				/*
 				 * Заменяем элемент j на новый элемент из
 				 * state2
