@@ -1406,15 +1406,8 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 			/*
 			 * Заменяем элемент j на новый элемент
 			 */
-			if (!state->typbyval && !state->samples->dnulls[j])
-			{
-				/*
-				 * Освобождаем предыдущее
-				 * значение, если это тип по ссылке
-				 */
-				pfree(DatumGetPointer(state->samples->dvalues[j]));
-			}
-
+			/* Старое значение будет автоматически освобождено при очистке контекста */
+			
 			if (!isNull)
 			{
 				if (!state->typbyval)
@@ -1422,14 +1415,18 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 					/*
 					 * Копируем новое значение, если это тип по ссылке
 					 */
-					state->samples->dvalues[j] = datumCopy(elem,
-														   state->typbyval,
-														   state->typlen);
+					if (state->typlen == -1)
+						state->samples->dvalues[j] = PointerGetDatum(PG_DETOAST_DATUM_COPY(elem));
+					else
+						state->samples->dvalues[j] = datumCopy(elem,
+															 state->typbyval,
+															 state->typlen);
 				}
 				else
 				{
 					/*
-					 * Просто присваиваем значение для типов по значению
+					 * Просто присваиваем значение для типов по
+					 * значению
 					 */
 					state->samples->dvalues[j] = elem;
 				}
@@ -1560,15 +1557,8 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 				 * Заменяем элемент j на новый элемент из
 				 * state2
 				 */
-				if (!state1->typbyval && !state1->samples->dnulls[j])
-				{
-					/*
-					 * Освобождаем предыдущее
-					 * значение, если это тип по ссылке
-					 */
-					pfree(DatumGetPointer(state1->samples->dvalues[j]));
-				}
-
+				/* Старое значение будет автоматически освобождено при очистке контекста */
+				
 				if (!state2->samples->dnulls[i])
 				{
 					if (!state1->typbyval)
@@ -1576,14 +1566,18 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 						/*
 						 * Копируем новое значение, если это тип по ссылке
 						 */
-						state1->samples->dvalues[j] = datumCopy(state2->samples->dvalues[i],
-																state1->typbyval,
-																state1->typlen);
+						if (state1->typlen == -1)
+							state1->samples->dvalues[j] = PointerGetDatum(PG_DETOAST_DATUM_COPY(state2->samples->dvalues[i]));
+						else
+							state1->samples->dvalues[j] = datumCopy(state2->samples->dvalues[i],
+																 state1->typbyval,
+																 state1->typlen);
 					}
 					else
 					{
 						/*
-						 * Просто присваиваем значение для типов по значению
+						 * Просто присваиваем значение для типов по
+						 * значению
 						 */
 						state1->samples->dvalues[j] = state2->samples->dvalues[i];
 					}
