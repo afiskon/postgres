@@ -1376,14 +1376,14 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	{
 		PG_RETURN_POINTER(state);
 	}
-
+	
 	/* Получаем элемент */
 	isNull = PG_ARGISNULL(1);
 	if (!isNull)
 		elem = PG_GETARG_DATUM(1);
 	else
 		elem = (Datum) 0;
-
+	
 	/* Реализация алгоритма reservoir sampling */
 	if (state->processed < state->nsamples)
 	{
@@ -1402,37 +1402,36 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 		{
 			/* Выбираем случайный элемент из резервуара для замены */
 			int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state->nsamples - 1);
-
-			/*
-			 * Заменяем элемент j на новый элемент
-			 */
-			/* Старое значение будет автоматически освобождено при очистке контекста */
 			
-			if (!isNull)
+			/* 
+			 * Создаем временный массив для новых значений и копируем туда все
+			 * кроме j-го элемента
+			 */
+			ArrayBuildState *newsamples = initArrayResult(state->element_type, aggcontext, false);
+			
+			for (int i = 0; i < state->samples->nelems; i++)
 			{
-				if (!state->typbyval)
+				if (i != j)
 				{
-					/*
-					 * Копируем новое значение, если это тип по ссылке
-					 */
-					if (state->typlen == -1)
-						state->samples->dvalues[j] = PointerGetDatum(PG_DETOAST_DATUM_COPY(elem));
-					else
-						state->samples->dvalues[j] = datumCopy(elem,
-															 state->typbyval,
-															 state->typlen);
+					newsamples = accumArrayResult(newsamples,
+												 state->samples->dvalues[i],
+												 state->samples->dnulls[i],
+												 state->element_type,
+												 aggcontext);
 				}
 				else
 				{
-					/*
-					 * Просто присваиваем значение для типов по
-					 * значению
-					 */
-					state->samples->dvalues[j] = elem;
+					/* На место j добавляем новый элемент */
+					newsamples = accumArrayResult(newsamples,
+												 elem,
+												 isNull,
+												 state->element_type,
+												 aggcontext);
 				}
 			}
-
-			state->samples->dnulls[j] = isNull;
+			
+			/* Заменяем массив на новый */
+			state->samples = newsamples;
 		}
 	}
 
@@ -1552,38 +1551,36 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 			{
 				/* Выбираем случайный элемент из резервуара для замены */
 				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
-
-				/*
-				 * Заменяем элемент j на новый элемент из
-				 * state2
-				 */
-				/* Старое значение будет автоматически освобождено при очистке контекста */
 				
-				if (!state2->samples->dnulls[i])
+				/* 
+				 * Создаем временный массив для новых значений и копируем туда все
+				 * кроме j-го элемента
+				 */
+				ArrayBuildState *newsamples = initArrayResult(state1->element_type, agg_context, false);
+				
+				for (int k = 0; k < state1->samples->nelems; k++)
 				{
-					if (!state1->typbyval)
+					if (k != j)
 					{
-						/*
-						 * Копируем новое значение, если это тип по ссылке
-						 */
-						if (state1->typlen == -1)
-							state1->samples->dvalues[j] = PointerGetDatum(PG_DETOAST_DATUM_COPY(state2->samples->dvalues[i]));
-						else
-							state1->samples->dvalues[j] = datumCopy(state2->samples->dvalues[i],
-																 state1->typbyval,
-																 state1->typlen);
+						newsamples = accumArrayResult(newsamples,
+													 state1->samples->dvalues[k],
+													 state1->samples->dnulls[k],
+													 state1->element_type,
+													 agg_context);
 					}
 					else
 					{
-						/*
-						 * Просто присваиваем значение для типов по
-						 * значению
-						 */
-						state1->samples->dvalues[j] = state2->samples->dvalues[i];
+						/* На место j добавляем элемент из state2 */
+						newsamples = accumArrayResult(newsamples,
+													 state2->samples->dvalues[i],
+													 state2->samples->dnulls[i],
+													 state1->element_type,
+													 agg_context);
 					}
 				}
-
-				state1->samples->dnulls[j] = state2->samples->dnulls[i];
+				
+				/* Заменяем массив на новый */
+				state1->samples = newsamples;
 			}
 		}
 	}
