@@ -1376,14 +1376,14 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	{
 		PG_RETURN_POINTER(state);
 	}
-	
+
 	/* Get the element */
 	isNull = PG_ARGISNULL(1);
 	if (!isNull)
 		elem = PG_GETARG_DATUM(1);
 	else
 		elem = (Datum) 0;
-	
+
 	/* Implementation of the reservoir sampling algorithm */
 	if (state->processed < state->nsamples)
 	{
@@ -1402,13 +1402,13 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 		{
 			/* Select a random element from the reservoir for replacement */
 			int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state->nsamples - 1);
-			
-			/* 
+
+			/*
 			 * Create a temporary array for new values and copy everything
 			 * except the j-th element
 			 */
 			ArrayBuildState *newsamples = initArrayResult(state->element_type, aggcontext, false);
-			
+
 			for (int i = 0; i < state->samples->nelems; i++)
 			{
 				if (i != j)
@@ -1429,7 +1429,7 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 												 aggcontext);
 				}
 			}
-			
+
 			/* Replace the array with the new one */
 			state->samples = newsamples;
 		}
@@ -1468,12 +1468,12 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	/*
-	/* If one of the states is NULL, return the other */
+	 * If one of the states is NULL, return the other
 	 */
 	if (state1 == NULL)
 	{
 		/*
-		/* Create a copy of state2 in the correct context */
+		 * Create a copy of state2 in the correct context
 		 */
 		result = initReservoirState(state2->element_type, state2->nsamples, agg_context);
 		result->processed = state2->processed;
@@ -1505,13 +1505,13 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	 */
 
 	/*
-	/* If nsamples in state1 is 0, just return the empty state */
+	 * If nsamples in state1 is 0, just return the empty state
 	 */
 	if (state1->nsamples <= 0)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	/* Update the total number of processed elements */
+	 * Update the total number of processed elements
 	 */
 	state1->processed += state2->processed;
 
@@ -1522,14 +1522,14 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	/* Add elements from state2 to state1 based on probability */
+	 * Add elements from state2 to state1 based on probability
 	 */
 	for (i = 0; i < state2->samples->nelems; i++)
 	{
 		if (state1->samples->nelems < state1->nsamples)
 		{
 			/*
-			/* If there's still room in state1, add the element */
+			 * If there's still room in state1, add the element
 			 */
 			state1->samples = accumArrayResult(state1->samples,
 											   state2->samples->dvalues[i],
@@ -1548,13 +1548,13 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 			{
 				/* Select a random element from the reservoir for replacement */
 				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
-				
-				/* 
+
+				/*
 				 * Create a temporary array for new values and copy everything
 				 * except the j-th element
 				 */
 				ArrayBuildState *newsamples = initArrayResult(state1->element_type, agg_context, false);
-				
+
 				for (int k = 0; k < state1->samples->nelems; k++)
 				{
 					if (k != j)
@@ -1575,7 +1575,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 													 agg_context);
 					}
 				}
-				
+
 				/* Replace the array with the new one */
 				state1->samples = newsamples;
 			}
