@@ -63,14 +63,14 @@ typedef struct ArraySortCachedInfo
  */
 typedef struct ReservoirState
 {
-	Oid			element_type;	/* Тип элементов */
-	int32		nsamples;		/* Максимальное количество элементов в выборке */
-	int64		processed;		/* Количество обработанных элементов */
-	ArrayBuildState *samples;	/* Массив выбранных элементов */
-	bool		typbyval;		/* Передается ли тип по значению */
-	int16		typlen;			/* Длина типа */
-	char		typalign;		/* Выравнивание типа */
-	MemoryContext mcontext;		/* Контекст памяти для состояния */
+	Oid			element_type;	/* Element type */
+	int32		nsamples;		/* Maximum number of elements in the sample */
+	int64		processed;		/* Number of processed elements */
+	ArrayBuildState *samples;	/* Array of selected elements */
+	bool		typbyval;		/* Whether the type is passed by value */
+	int16		typlen;			/* Type length */
+	char		typalign;		/* Type alignment */
+	MemoryContext mcontext;		/* Memory context for the state */
 } ReservoirState;
 
 /*
@@ -1436,7 +1436,7 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	}
 
 	/*
-	/* Increment the counter of processed elements */
+	 * Increment the counter of processed elements
 	 */
 	state->processed++;
 
@@ -1462,8 +1462,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	state2 = PG_ARGISNULL(1) ? NULL : (ReservoirState *) PG_GETARG_POINTER(1);
 
 	/*
-	/* If both states are NULL, just return NULL */
-	 * NULL
+	 * If both states are NULL, just return NULL
 	 */
 	if (state1 == NULL && state2 == NULL)
 		PG_RETURN_NULL();
@@ -1499,11 +1498,10 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * Объединение двух состояний - более сложная
-	 * задача, требующая правильного объединения
-	 * выборок. Для простоты будем рассматривать
-	 * state1 как основное состояние и случайным образом добавлять элементы из
-	 * state2.
+	 * Combining two states is a more complex task
+	 * that requires proper merging of samples.
+	 * For simplicity, we treat state1 as the main state
+	 * and randomly add elements from state2.
 	 */
 
 	/*
@@ -1518,8 +1516,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	state1->processed += state2->processed;
 
 	/*
-	/* If state2 contains no elements, just return state1 */
-	 * state1
+	 * If state2 contains no elements, just return state1
 	 */
 	if (state2->samples->nelems <= 0)
 		PG_RETURN_POINTER(state1);
@@ -1549,7 +1546,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 			/* Generate a random number [0, 1) and check the probability of including the element */
 			if (pg_prng_double(&pg_global_prng_state) < (double) state1->nsamples / (double) (state1->processed + 1))
 			{
-				/* Выбираем случайный элемент из резервуара для замены */
+				/* Select a random element from the reservoir for replacement */
 				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
 				
 				/* 
