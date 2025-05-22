@@ -1879,11 +1879,20 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 		lbs[0] = 1;
 
 		/* Создаем пустой массив */
-		result = PointerGetDatum(construct_md_array(NULL, NULL, 1, dims, lbs,
-													element_type,
-													get_typlen(element_type),
-													get_typbyval(element_type),
-													get_typalign(element_type)));
+		{
+			int16		typlen;
+			bool		typbyval;
+			char		typalign;
+			// AALEKSEEV TODO OPTIMIZE, the call of get_typlenbyvalalign is not necessary sometimes
+			// see array_shuffle implementation
+
+			get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
+			result = PointerGetDatum(construct_md_array(NULL, NULL, 1, dims, lbs,
+														element_type,
+														typlen,
+														typbyval,
+														typalign));
+		}
 	}
 	else
 	{
