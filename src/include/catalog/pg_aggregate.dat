@@ -565,7 +565,7 @@
   aggserialfn => 'array_agg_array_serialize',
   aggdeserialfn => 'array_agg_array_deserialize', aggfinalextra => 't',
   aggtranstype => 'internal' },
-{ aggfnoid => 'array_sample_reservoir(anynonarray)',
+{ aggfnoid => 'array_sample_reservoir(anynonarray,int4)',
   aggtransfn => 'array_sample_reservoir_transfn',
   aggfinalfn => 'array_sample_reservoir_finalfn',
   aggcombinefn => 'array_sample_reservoir_combine',
