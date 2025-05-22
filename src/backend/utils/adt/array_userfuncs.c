@@ -80,23 +80,25 @@ static ReservoirState *
 initReservoirState(Oid element_type, int32 nsamples, MemoryContext mcxt)
 {
 	ReservoirState *result;
-	
-	/* Выделяем память для структуры состояния */
+
+	/*
+	 * Выделяем память для структуры состояния
+	 */
 	result = (ReservoirState *) MemoryContextAlloc(mcxt, sizeof(ReservoirState));
-	
+
 	/* Инициализируем поля */
 	result->element_type = element_type;
 	result->nsamples = nsamples > 0 ? nsamples : 0; /* Защита от отрицательных значений */
 	result->processed = 0;
 	result->samples = initArrayResult(element_type, mcxt, false);
 	result->mcontext = mcxt;
-	
+
 	/* Получаем информацию о типе элемента */
 	get_typlenbyvalalign(element_type,
 						 &result->typlen,
 						 &result->typbyval,
 						 &result->typalign);
-	
+
 	return result;
 }
 
@@ -1343,50 +1345,54 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	bool		isNull;
 	Oid			arg_type;
 	int32		nsamples;
-	
+
 	/* Получаем тип первого аргумента */
 	arg_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
 	if (arg_type == InvalidOid)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("could not determine input data type")));
-	
+
 	/* Проверяем контекст вызова */
 	if (!AggCheckCallContext(fcinfo, &aggcontext))
 	{
 		/* cannot be called directly because of internal-type argument */
 		elog(ERROR, "array_sample_reservoir_transfn called in non-aggregate context");
 	}
-	
+
 	/* Получаем параметр nsamples */
 	if (PG_ARGISNULL(2))
-		nsamples = 0;  /* По умолчанию 0 - пустой массив */
+		nsamples = 0;			/* По умолчанию 0 - пустой массив */
 	else
 		nsamples = PG_GETARG_INT32(2);
-	
-	/* Инициализируем или получаем существующее состояние */
+
+	/*
+	 * Инициализируем или получаем существующее состояние
+	 */
 	if (PG_ARGISNULL(0))
 		state = initReservoirState(arg_type, nsamples, aggcontext);
 	else
 		state = (ReservoirState *) PG_GETARG_POINTER(0);
-	
+
 	/* Пропускаем обработку, если nsamples <= 0 */
 	if (state->nsamples <= 0)
 	{
 		PG_RETURN_POINTER(state);
 	}
-	
+
 	/* Получаем элемент */
 	isNull = PG_ARGISNULL(1);
 	if (!isNull)
 		elem = PG_GETARG_DATUM(1);
 	else
 		elem = (Datum) 0;
-	
+
 	/* Реализация алгоритма reservoir sampling */
 	if (state->processed < state->nsamples)
 	{
-		/* Первые nsamples элементов добавляем напрямую */
+		/*
+		 * Первые nsamples элементов добавляем напрямую
+		 */
 		state->samples = accumArrayResult(state->samples,
 										  elem,
 										  isNull,
@@ -1395,41 +1401,54 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* Для следующих элементов используем вероятностный алгоритм */
+		/*
+		 * Для следующих элементов используем вероятностный алгоритм
+		 */
 		int64		j = (int64) (((double) state->nsamples) * random() / ((double) MAX_RANDOM_VALUE + 1));
-		
+
 		if (j < state->nsamples)
 		{
-			/* Заменяем элемент j на новый элемент */
+			/*
+			 * Заменяем элемент j на новый элемент
+			 */
 			if (!state->typbyval && !state->samples->dnulls[j])
 			{
-				/* Освобождаем предыдущее значение, если это тип по ссылке */
+				/*
+				 * Освобождаем предыдущее
+				 * значение, если это тип по ссылке
+				 */
 				pfree(DatumGetPointer(state->samples->dvalues[j]));
 			}
-			
+
 			if (!isNull)
 			{
 				if (!state->typbyval)
 				{
-					/* Копируем новое значение, если это тип по ссылке */
+					/*
+					 * Копируем новое значение, если это тип по ссылке
+					 */
 					state->samples->dvalues[j] = datumCopy(elem,
 														   state->typbyval,
 														   state->typlen);
 				}
 				else
 				{
-					/* Просто присваиваем значение для типов по значению */
+					/*
+					 * Просто присваиваем значение для типов по значению
+					 */
 					state->samples->dvalues[j] = elem;
 				}
 			}
-			
+
 			state->samples->dnulls[j] = isNull;
 		}
 	}
-	
-	/* Увеличиваем счетчик обработанных элементов */
+
+	/*
+	 * Увеличиваем счетчик обработанных элементов
+	 */
 	state->processed++;
-	
+
 	PG_RETURN_POINTER(state);
 }
 
@@ -1444,24 +1463,31 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	MemoryContext agg_context;
 	ReservoirState *result;
 	int			i;
-	
+
 	if (!AggCheckCallContext(fcinfo, &agg_context))
 		elog(ERROR, "aggregate function called in non-aggregate context");
-	
+
 	state1 = PG_ARGISNULL(0) ? NULL : (ReservoirState *) PG_GETARG_POINTER(0);
 	state2 = PG_ARGISNULL(1) ? NULL : (ReservoirState *) PG_GETARG_POINTER(1);
-	
-	/* Если оба состояния NULL, просто возвращаем NULL */
+
+	/*
+	 * Если оба состояния NULL, просто возвращаем
+	 * NULL
+	 */
 	if (state1 == NULL && state2 == NULL)
 		PG_RETURN_NULL();
-	
-	/* Если одно из состояний NULL, возвращаем другое */
+
+	/*
+	 * Если одно из состояний NULL, возвращаем другое
+	 */
 	if (state1 == NULL)
 	{
-		/* Создаем копию state2 в правильном контексте */
+		/*
+		 * Создаем копию state2 в правильном контексте
+		 */
 		result = initReservoirState(state2->element_type, state2->nsamples, agg_context);
 		result->processed = state2->processed;
-		
+
 		/* Копируем элементы из state2 */
 		if (state2->samples->nelems > 0)
 		{
@@ -1474,36 +1500,49 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 												   agg_context);
 			}
 		}
-		
+
 		PG_RETURN_POINTER(result);
 	}
-	
+
 	if (state2 == NULL)
 		PG_RETURN_POINTER(state1);
-	
+
 	/*
-	 * Объединение двух состояний - более сложная задача, требующая правильного
-	 * объединения выборок. Для простоты будем рассматривать state1 как основное
-	 * состояние и случайным образом добавлять элементы из state2.
+	 * Объединение двух состояний - более сложная
+	 * задача, требующая правильного объединения
+	 * выборок. Для простоты будем рассматривать
+	 * state1 как основное состояние и случайным образом добавлять элементы из
+	 * state2.
 	 */
-	
-	/* Если nsamples в state1 равно 0, просто возвращаем пустое состояние */
+
+	/*
+	 * Если nsamples в state1 равно 0, просто возвращаем пустое состояние
+	 */
 	if (state1->nsamples <= 0)
 		PG_RETURN_POINTER(state1);
-	
-	/* Обновляем общее количество обработанных элементов */
+
+	/*
+	 * Обновляем общее количество обработанных элементов
+	 */
 	state1->processed += state2->processed;
-	
-	/* Если state2 не содержит элементов, просто возвращаем state1 */
+
+	/*
+	 * Если state2 не содержит элементов, просто возвращаем
+	 * state1
+	 */
 	if (state2->samples->nelems <= 0)
 		PG_RETURN_POINTER(state1);
-	
-	/* Добавляем элементы из state2 в state1 с учетом вероятности */
+
+	/*
+	 * Добавляем элементы из state2 в state1 с учетом вероятности
+	 */
 	for (i = 0; i < state2->samples->nelems; i++)
 	{
 		if (state1->samples->nelems < state1->nsamples)
 		{
-			/* Если в state1 еще есть место, добавляем элемент */
+			/*
+			 * Если в state1 еще есть место, добавляем элемент
+			 */
 			state1->samples = accumArrayResult(state1->samples,
 											   state2->samples->dvalues[i],
 											   state2->samples->dnulls[i],
@@ -1512,39 +1551,52 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* Иначе добавляем с вероятностью nsamples / processed */
+			/*
+			 * Иначе добавляем с вероятностью
+			 * nsamples / processed
+			 */
 			int64		j = (int64) (((double) state1->nsamples) * random() / ((double) MAX_RANDOM_VALUE + 1));
-			
+
 			if (j < state1->nsamples)
 			{
-				/* Заменяем элемент j на новый элемент из state2 */
+				/*
+				 * Заменяем элемент j на новый элемент из
+				 * state2
+				 */
 				if (!state1->typbyval && !state1->samples->dnulls[j])
 				{
-					/* Освобождаем предыдущее значение, если это тип по ссылке */
+					/*
+					 * Освобождаем предыдущее
+					 * значение, если это тип по ссылке
+					 */
 					pfree(DatumGetPointer(state1->samples->dvalues[j]));
 				}
-				
+
 				if (!state2->samples->dnulls[i])
 				{
 					if (!state1->typbyval)
 					{
-						/* Копируем новое значение, если это тип по ссылке */
+						/*
+						 * Копируем новое значение, если это тип по ссылке
+						 */
 						state1->samples->dvalues[j] = datumCopy(state2->samples->dvalues[i],
-															   state1->typbyval,
-															   state1->typlen);
+																state1->typbyval,
+																state1->typlen);
 					}
 					else
 					{
-						/* Просто присваиваем значение для типов по значению */
+						/*
+						 * Просто присваиваем значение для типов по значению
+						 */
 						state1->samples->dvalues[j] = state2->samples->dvalues[i];
 					}
 				}
-				
+
 				state1->samples->dnulls[j] = state2->samples->dnulls[i];
 			}
 		}
 	}
-	
+
 	PG_RETURN_POINTER(state1);
 }
 
@@ -1558,14 +1610,14 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	StringInfoData buf;
 	bytea	   *result;
 	int			i;
-	
+
 	/* Проверяем контекст вызова */
 	Assert(AggCheckCallContext(fcinfo, NULL));
-	
+
 	state = (ReservoirState *) PG_GETARG_POINTER(0);
-	
+
 	pq_begintypsend(&buf);
-	
+
 	/* Сериализуем поля структуры ReservoirState */
 	pq_sendint32(&buf, state->element_type);
 	pq_sendint32(&buf, state->nsamples);
@@ -1573,14 +1625,20 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	pq_sendint16(&buf, state->typlen);
 	pq_sendbyte(&buf, state->typbyval);
 	pq_sendbyte(&buf, state->typalign);
-	
-	/* Сериализуем количество элементов в samples */
+
+	/*
+	 * Сериализуем количество элементов в
+	 * samples
+	 */
 	pq_sendint32(&buf, state->samples->nelems);
-	
+
 	/* Сериализуем флаги NULL */
 	pq_sendbytes(&buf, state->samples->dnulls, sizeof(bool) * state->samples->nelems);
-	
-	/* Сериализуем значения, аналогично array_agg_serialize */
+
+	/*
+	 * Сериализуем значения, аналогично
+	 * array_agg_serialize
+	 */
 	if (state->typbyval)
 	{
 		pq_sendbytes(&buf, state->samples->dvalues, sizeof(Datum) * state->samples->nelems);
@@ -1588,14 +1646,17 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	else
 	{
 		SerialIOData *iodata;
-		
-		/* Избегаем повторных поисков в каталоге для функции typsend */
+
+		/*
+		 * Избегаем повторных поисков в каталоге для функции
+		 * typsend
+		 */
 		iodata = (SerialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
 		{
 			Oid			typsend;
 			bool		typisvarlena;
-			
+
 			iodata = (SerialIOData *)
 				MemoryContextAlloc(fcinfo->flinfo->fn_mcxt,
 								   sizeof(SerialIOData));
@@ -1605,11 +1666,11 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 						  fcinfo->flinfo->fn_mcxt);
 			fcinfo->flinfo->fn_extra = iodata;
 		}
-		
+
 		for (i = 0; i < state->samples->nelems; i++)
 		{
 			bytea	   *outputbytes;
-			
+
 			if (state->samples->dnulls[i])
 				continue;
 			outputbytes = SendFunctionCall(&iodata->typsend,
@@ -1619,9 +1680,9 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 						 VARSIZE(outputbytes) - VARHDRSZ);
 		}
 	}
-	
+
 	result = pq_endtypsend(&buf);
-	
+
 	PG_RETURN_BYTEA_P(result);
 }
 
@@ -1643,16 +1704,18 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	int			nelems;
 	const char *temp;
 	int			i;
-	
+
 	if (!AggCheckCallContext(fcinfo, NULL))
 		elog(ERROR, "aggregate function called in non-aggregate context");
-	
+
 	sstate = PG_GETARG_BYTEA_PP(0);
-	
-	/* Инициализируем StringInfo для чтения сериализованных данных */
+
+	/*
+	 * Инициализируем StringInfo для чтения сериализованных данных
+	 */
 	initReadOnlyStringInfo(&buf, VARDATA_ANY(sstate),
 						   VARSIZE_ANY_EXHDR(sstate));
-	
+
 	/* Десериализуем поля структуры ReservoirState */
 	element_type = pq_getmsgint(&buf, 4);
 	nsamples = pq_getmsgint(&buf, 4);
@@ -1660,34 +1723,39 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	typlen = pq_getmsgint(&buf, 2);
 	typbyval = pq_getmsgbyte(&buf);
 	typalign = pq_getmsgbyte(&buf);
-	
-	/* Десериализуем количество элементов в samples */
+
+	/*
+	 * Десериализуем количество элементов в
+	 * samples
+	 */
 	nelems = pq_getmsgint(&buf, 4);
-	
+
 	/* Создаем новое состояние */
 	result = initReservoirState(element_type, nsamples, CurrentMemoryContext);
 	result->processed = processed;
 	result->typlen = typlen;
 	result->typbyval = typbyval;
 	result->typalign = typalign;
-	
+
 	/* Десериализуем флаги NULL */
 	temp = pq_getmsgbytes(&buf, sizeof(bool) * nelems);
-	
+
 	/* Десериализуем значения */
 	if (typbyval)
 	{
-		/* Для типов по значению просто копируем данные */
-		Datum *values = (Datum *) pq_getmsgbytes(&buf, sizeof(Datum) * nelems);
-		
+		/*
+		 * Для типов по значению просто копируем данные
+		 */
+		Datum	   *values = (Datum *) pq_getmsgbytes(&buf, sizeof(Datum) * nelems);
+
 		for (i = 0; i < nelems; i++)
 		{
-			bool isNull = ((bool *) temp)[i];
-			Datum value = 0;
-			
+			bool		isNull = ((bool *) temp)[i];
+			Datum		value = 0;
+
 			if (!isNull)
 				value = values[i];
-			
+
 			result->samples = accumArrayResult(result->samples,
 											   value,
 											   isNull,
@@ -1697,15 +1765,20 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* Для типов по ссылке используем функцию приема */
+		/*
+		 * Для типов по ссылке используем функцию приема
+		 */
 		DeserialIOData *iodata;
-		
-		/* Избегаем повторных поисков в каталоге для функции typreceive */
+
+		/*
+		 * Избегаем повторных поисков в каталоге для функции
+		 * typreceive
+		 */
 		iodata = (DeserialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
 		{
 			Oid			typreceive;
-			
+
 			iodata = (DeserialIOData *)
 				MemoryContextAlloc(fcinfo->flinfo->fn_mcxt,
 								   sizeof(DeserialIOData));
@@ -1715,11 +1788,11 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 						  fcinfo->flinfo->fn_mcxt);
 			fcinfo->flinfo->fn_extra = iodata;
 		}
-		
+
 		for (i = 0; i < nelems; i++)
 		{
-			bool isNull = ((bool *) temp)[i];
-			
+			bool		isNull = ((bool *) temp)[i];
+
 			if (isNull)
 			{
 				result->samples = accumArrayResult(result->samples,
@@ -1733,24 +1806,28 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 				int			itemlen;
 				StringInfoData elem_buf;
 				Datum		value;
-				
+
 				itemlen = pq_getmsgint(&buf, 4);
 				if (itemlen < 0 || itemlen > (buf.len - buf.cursor))
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
 							 errmsg("insufficient data left in message")));
-				
-				/* Инициализируем StringInfo для элемента */
+
+				/*
+				 * Инициализируем StringInfo для элемента
+				 */
 				initReadOnlyStringInfo(&elem_buf, &buf.data[buf.cursor], itemlen);
-				
+
 				buf.cursor += itemlen;
-				
-				/* Вызываем функцию приема для элемента */
+
+				/*
+				 * Вызываем функцию приема для элемента
+				 */
 				value = ReceiveFunctionCall(&iodata->typreceive,
 											&elem_buf,
 											iodata->typioparam,
 											-1);
-				
+
 				result->samples = accumArrayResult(result->samples,
 												   value,
 												   false,
@@ -1759,9 +1836,9 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 			}
 		}
 	}
-	
+
 	pq_getmsgend(&buf);
-	
+
 	PG_RETURN_POINTER(result);
 }
 
@@ -1775,30 +1852,32 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 	ReservoirState *state;
 	int			dims[1];
 	int			lbs[1];
-	
+
 	/* Проверяем контекст вызова */
 	Assert(AggCheckCallContext(fcinfo, NULL));
-	
+
 	state = PG_ARGISNULL(0) ? NULL : (ReservoirState *) PG_GETARG_POINTER(0);
-	
+
 	if (state == NULL || state->nsamples <= 0 || state->samples->nelems <= 0)
 	{
-		/* Если состояние NULL или пусто, возвращаем пустой массив */
-		Oid element_type;
-		
+		/*
+		 * Если состояние NULL или пусто, возвращаем пустой массив
+		 */
+		Oid			element_type;
+
 		if (state != NULL)
 			element_type = state->element_type;
 		else
 			element_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
-		
+
 		if (element_type == InvalidOid)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("could not determine input data type")));
-		
+
 		dims[0] = 0;
 		lbs[0] = 1;
-		
+
 		/* Создаем пустой массив */
 		result = PointerGetDatum(construct_md_array(NULL, NULL, 1, dims, lbs,
 													element_type,
@@ -1811,12 +1890,12 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 		/* Создаем массив из элементов в samples */
 		dims[0] = state->samples->nelems;
 		lbs[0] = 1;
-		
+
 		result = makeMdArrayResult(state->samples, 1, dims, lbs,
 								   CurrentMemoryContext,
 								   false);
 	}
-	
+
 	PG_RETURN_DATUM(result);
 }
 
