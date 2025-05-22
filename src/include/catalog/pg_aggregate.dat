@@ -565,6 +565,14 @@
   aggserialfn => 'array_agg_array_serialize',
   aggdeserialfn => 'array_agg_array_deserialize', aggfinalextra => 't',
   aggtranstype => 'internal' },
+{ aggfnoid => 'array_sample_reservoir(anynonarray)',
+  aggtransfn => 'array_sample_reservoir_transfn',
+  aggfinalfn => 'array_sample_reservoir_finalfn',
+  aggcombinefn => 'array_sample_reservoir_combine',
+  aggserialfn => 'array_sample_reservoir_serialize',
+  aggdeserialfn => 'array_sample_reservoir_deserialize',
+  aggfinalextra => 't',
+  aggtranstype => 'internal' },
 
 # text
 { aggfnoid => 'string_agg(text,text)', aggtransfn => 'string_agg_transfn',

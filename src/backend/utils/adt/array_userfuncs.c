@@ -1289,6 +1289,185 @@ array_agg_array_finalfn(PG_FUNCTION_ARGS)
 	PG_RETURN_DATUM(result);
 }
 
+/*
+ * array_sample_reservoir_transfn - функция перехода для array_sample_reservoir
+ */
+Datum
+array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
+{
+	Oid			arg1_typeid = get_fn_expr_argtype(fcinfo->flinfo, 1);
+	MemoryContext aggcontext;
+	ArrayBuildState *state;
+
+	if (arg1_typeid == InvalidOid)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("could not determine input data type")));
+
+	/*
+	 * Note: we do not need a run-time check about whether arg1_typeid is a
+	 * valid array element type, because the parser would have verified that
+	 * while resolving the input/result types of this polymorphic aggregate.
+	 */
+	if (!AggCheckCallContext(fcinfo, &aggcontext))
+	{
+		/* cannot be called directly because of internal-type argument */
+		elog(ERROR, "array_sample_reservoir_transfn called in non-aggregate context");
+	}
+
+	/* Просто инициализируем пустое состояние, но ничего не добавляем в него */
+	if (PG_ARGISNULL(0))
+		state = initArrayResult(arg1_typeid, aggcontext, false);
+	else
+		state = (ArrayBuildState *) PG_GETARG_POINTER(0);
+
+	/* Игнорируем входные данные - наш агрегат всегда возвращает пустой массив */
+	PG_RETURN_POINTER(state);
+}
+
+/*
+ * array_sample_reservoir_combine - функция комбинирования для array_sample_reservoir
+ */
+Datum
+array_sample_reservoir_combine(PG_FUNCTION_ARGS)
+{
+	ArrayBuildState *state1;
+	MemoryContext agg_context;
+
+	if (!AggCheckCallContext(fcinfo, &agg_context))
+		elog(ERROR, "aggregate function called in non-aggregate context");
+
+	state1 = PG_ARGISNULL(0) ? NULL : (ArrayBuildState *) PG_GETARG_POINTER(0);
+
+	/* Для пустого массива мы просто возвращаем state1, не меняя его */
+	if (state1 == NULL)
+	{
+		/*
+		 * Если state1 == NULL, нам нужно создать пустое состояние.
+		 * Но это невозможно без информации о типе элементов.
+		 * В реальной функции, которая возвращает непустой массив, это не проблема.
+		 * Для нашего случая, поскольку мы в итоге всегда возвращаем пустой массив,
+		 * можно просто вернуть NULL. Финальная функция обработает этот случай.
+		 */
+		PG_RETURN_NULL();
+	}
+
+	PG_RETURN_POINTER(state1);
+}
+
+/*
+ * array_sample_reservoir_serialize - функция сериализации для array_sample_reservoir
+ */
+Datum
+array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
+{
+	ArrayBuildState *state;
+	StringInfoData buf;
+	bytea	   *result;
+
+	/* cannot be called directly because of internal-type argument */
+	Assert(AggCheckCallContext(fcinfo, NULL));
+
+	state = (ArrayBuildState *) PG_GETARG_POINTER(0);
+
+	pq_begintypsend(&buf);
+
+	/* Сериализуем только тип элемента, так как мы всегда возвращаем пустой массив */
+	pq_sendint32(&buf, state->element_type);
+
+	/* Отправляем 0 элементов */
+	pq_sendint64(&buf, 0);
+
+	/* Остальные параметры сериализуем для полноты */
+	pq_sendint16(&buf, state->typlen);
+	pq_sendbyte(&buf, state->typbyval);
+	pq_sendbyte(&buf, state->typalign);
+
+	result = pq_endtypsend(&buf);
+
+	PG_RETURN_BYTEA_P(result);
+}
+
+/*
+ * array_sample_reservoir_deserialize - функция десериализации для array_sample_reservoir
+ */
+Datum
+array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
+{
+	bytea	   *sstate;
+	ArrayBuildState *result;
+	StringInfoData buf;
+	Oid			element_type;
+
+	if (!AggCheckCallContext(fcinfo, NULL))
+		elog(ERROR, "aggregate function called in non-aggregate context");
+
+	sstate = PG_GETARG_BYTEA_PP(0);
+
+	initReadOnlyStringInfo(&buf, VARDATA_ANY(sstate),
+						   VARSIZE_ANY_EXHDR(sstate));
+
+	/* Считываем тип элемента */
+	element_type = pq_getmsgint(&buf, 4);
+
+	/* Игнорируем остальные поля - мы всегда создаем пустое состояние */
+	pq_getmsgint64(&buf); /* nelems */
+	pq_getmsgint(&buf, 2); /* typlen */
+	pq_getmsgbyte(&buf); /* typbyval */
+	pq_getmsgbyte(&buf); /* typalign */
+
+	/* Создаем пустое состояние с правильным типом элемента */
+	result = initArrayResult(element_type, CurrentMemoryContext, false);
+
+	pq_getmsgend(&buf);
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * array_sample_reservoir_finalfn - финальная функция для array_sample_reservoir
+ */
+Datum
+array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
+{
+	Datum		result;
+	ArrayBuildState *state;
+	int			dims[1];
+	int			lbs[1];
+
+	/* cannot be called directly because of internal-type argument */
+	Assert(AggCheckCallContext(fcinfo, NULL));
+
+	state = PG_ARGISNULL(0) ? NULL : (ArrayBuildState *) PG_GETARG_POINTER(0);
+
+	if (state == NULL)
+	{
+		/*
+		 * Если по какой-то причине у нас нет состояния, создаем пустой массив
+		 * с типом второго аргумента
+		 */
+		Oid element_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
+
+		if (element_type == InvalidOid)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("could not determine input data type")));
+
+		state = initArrayResult(element_type, CurrentMemoryContext, false);
+	}
+
+	/* Всегда создаем пустой массив - размер 0 элементов */
+	dims[0] = 0;
+	lbs[0] = 1;
+
+	result = makeMdArrayResult(state, 1, dims, lbs,
+							   CurrentMemoryContext,
+							   false);
+
+	PG_RETURN_DATUM(result);
+}
+
+
 /*-----------------------------------------------------------------------------
  * array_position, array_position_start :
  *			return the offset of a value in an array.
