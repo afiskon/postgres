@@ -88,8 +88,7 @@ initReservoirState(Oid element_type, int32 nsamples, MemoryContext mcxt)
 
 	/* Initialize fields */
 	result->element_type = element_type;
-	result->nsamples = nsamples > 0 ? nsamples : 0; /* Protection against
-													 * negative values */
+	result->nsamples = nsamples > 0 ? nsamples : 0; /* Protection against negative values */
 	result->processed = 0;
 	result->samples = initArrayResult(element_type, mcxt, false);
 	result->mcontext = mcxt;
@@ -1377,14 +1376,14 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	{
 		PG_RETURN_POINTER(state);
 	}
-
+	
 	/* Get the element */
 	isNull = PG_ARGISNULL(1);
 	if (!isNull)
 		elem = PG_GETARG_DATUM(1);
 	else
 		elem = (Datum) 0;
-
+	
 	/* Implementation of the reservoir sampling algorithm */
 	if (state->processed < state->nsamples)
 	{
@@ -1398,42 +1397,39 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	else
 	{
 		/* For subsequent elements, use a probabilistic algorithm */
-		/*
-		 * Generate a random number [0, 1) and check the probability of
-		 * including the element
-		 */
+		/* Generate a random number [0, 1) and check the probability of including the element */
 		if (pg_prng_double(&pg_global_prng_state) < (double) state->nsamples / (double) (state->processed + 1))
 		{
 			/* Select a random element from the reservoir for replacement */
 			int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state->nsamples - 1);
-
-			/*
+			
+			/* 
 			 * Create a temporary array for new values and copy everything
 			 * except the j-th element
 			 */
 			ArrayBuildState *newsamples = initArrayResult(state->element_type, aggcontext, false);
-
+			
 			for (int i = 0; i < state->samples->nelems; i++)
 			{
 				if (i != j)
 				{
 					newsamples = accumArrayResult(newsamples,
-												  state->samples->dvalues[i],
-												  state->samples->dnulls[i],
-												  state->element_type,
-												  aggcontext);
+												 state->samples->dvalues[i],
+												 state->samples->dnulls[i],
+												 state->element_type,
+												 aggcontext);
 				}
 				else
 				{
 					/* Add the new element in place of j */
 					newsamples = accumArrayResult(newsamples,
-												  elem,
-												  isNull,
-												  state->element_type,
-												  aggcontext);
+												 elem,
+												 isNull,
+												 state->element_type,
+												 aggcontext);
 				}
 			}
-
+			
 			/* Replace the array with the new one */
 			state->samples = newsamples;
 		}
@@ -1472,16 +1468,14 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	/*
-	 * /* If one of the states is NULL, return the other
+	/* If one of the states is NULL, return the other */
 	 */
-	*/
-		if (state1 == NULL)
+	if (state1 == NULL)
 	{
 		/*
-		 * /* Create a copy of state2 in the correct context
+		/* Create a copy of state2 in the correct context */
 		 */
-		*/
-			result = initReservoirState(state2->element_type, state2->nsamples, agg_context);
+		result = initReservoirState(state2->element_type, state2->nsamples, agg_context);
 		result->processed = state2->processed;
 
 		/* Copy elements from state2 */
@@ -1504,23 +1498,22 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * Combining two states is a more complex task that requires proper
-	 * merging of samples. For simplicity, we treat state1 as the main state
+	 * Combining two states is a more complex task
+	 * that requires proper merging of samples.
+	 * For simplicity, we treat state1 as the main state
 	 * and randomly add elements from state2.
 	 */
 
 	/*
-	 * /* If nsamples in state1 is 0, just return the empty state
+	/* If nsamples in state1 is 0, just return the empty state */
 	 */
-	*/
-		if (state1->nsamples <= 0)
+	if (state1->nsamples <= 0)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * /* Update the total number of processed elements
+	/* Update the total number of processed elements */
 	 */
-	*/
-		state1->processed += state2->processed;
+	state1->processed += state2->processed;
 
 	/*
 	 * If state2 contains no elements, just return state1
@@ -1529,64 +1522,60 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * /* Add elements from state2 to state1 based on probability
+	/* Add elements from state2 to state1 based on probability */
 	 */
-	*/
-		for (i = 0; i < state2->samples->nelems; i++)
+	for (i = 0; i < state2->samples->nelems; i++)
 	{
 		if (state1->samples->nelems < state1->nsamples)
 		{
 			/*
-			 * /* If there's still room in state1, add the element
+			/* If there's still room in state1, add the element */
 			 */
-			*/
-				state1->samples = accumArrayResult(state1->samples,
-												   state2->samples->dvalues[i],
-												   state2->samples->dnulls[i],
-												   state1->element_type,
-												   agg_context);
+			state1->samples = accumArrayResult(state1->samples,
+											   state2->samples->dvalues[i],
+											   state2->samples->dnulls[i],
+											   state1->element_type,
+											   agg_context);
 		}
 		else
 		{
 			/*
-			 * Otherwise, add with probability nsamples / processed
+			 * Otherwise, add with probability
+			 * nsamples / processed
 			 */
-			/*
-			 * Generate a random number [0, 1) and check the probability of
-			 * including the element
-			 */
+			/* Generate a random number [0, 1) and check the probability of including the element */
 			if (pg_prng_double(&pg_global_prng_state) < (double) state1->nsamples / (double) (state1->processed + 1))
 			{
 				/* Select a random element from the reservoir for replacement */
 				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
-
-				/*
+				
+				/* 
 				 * Create a temporary array for new values and copy everything
 				 * except the j-th element
 				 */
 				ArrayBuildState *newsamples = initArrayResult(state1->element_type, agg_context, false);
-
+				
 				for (int k = 0; k < state1->samples->nelems; k++)
 				{
 					if (k != j)
 					{
 						newsamples = accumArrayResult(newsamples,
-													  state1->samples->dvalues[k],
-													  state1->samples->dnulls[k],
-													  state1->element_type,
-													  agg_context);
+													 state1->samples->dvalues[k],
+													 state1->samples->dnulls[k],
+													 state1->element_type,
+													 agg_context);
 					}
 					else
 					{
 						/* Add the element from state2 in place of j */
 						newsamples = accumArrayResult(newsamples,
-													  state2->samples->dvalues[i],
-													  state2->samples->dnulls[i],
-													  state1->element_type,
-													  agg_context);
+													 state2->samples->dvalues[i],
+													 state2->samples->dnulls[i],
+													 state1->element_type,
+													 agg_context);
 					}
 				}
-
+				
 				/* Replace the array with the new one */
 				state1->samples = newsamples;
 			}
@@ -1623,7 +1612,8 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	pq_sendbyte(&buf, state->typalign);
 
 	/*
-	 * Serialize the number of elements in samples
+	 * Serialize the number of elements in
+	 * samples
 	 */
 	pq_sendint32(&buf, state->samples->nelems);
 
@@ -1631,7 +1621,8 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	pq_sendbytes(&buf, state->samples->dnulls, sizeof(bool) * state->samples->nelems);
 
 	/*
-	 * Serialize values, similar to array_agg_serialize
+	 * Serialize values, similar to
+	 * array_agg_serialize
 	 */
 	if (state->typbyval)
 	{
@@ -1642,7 +1633,8 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 		SerialIOData *iodata;
 
 		/*
-		 * Avoid repeated catalog lookups for the typsend function
+		 * Avoid repeated catalog lookups for the
+		 * typsend function
 		 */
 		iodata = (SerialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
@@ -1718,7 +1710,8 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	typalign = pq_getmsgbyte(&buf);
 
 	/*
-	 * Deserialize the number of elements in samples
+	 * Deserialize the number of elements in
+	 * samples
 	 */
 	nelems = pq_getmsgint(&buf, 4);
 
@@ -1763,7 +1756,8 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 		DeserialIOData *iodata;
 
 		/*
-		 * Avoid repeated catalog lookups for the typreceive function
+		 * Avoid repeated catalog lookups for the
+		 * typreceive function
 		 */
 		iodata = (DeserialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
@@ -1874,12 +1868,8 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 			int16		typlen;
 			bool		typbyval;
 			char		typalign;
-
-			/*
-			 * AALEKSEEV TODO OPTIMIZE, the call of get_typlenbyvalalign is
-			 * not necessary sometimes
-			 */
-			/* see array_shuffle implementation */
+			// AALEKSEEV TODO OPTIMIZE, the call of get_typlenbyvalalign is not necessary sometimes
+			// see array_shuffle implementation
 
 			get_typlenbyvalalign(element_type, &typlen, &typbyval, &typalign);
 			result = PointerGetDatum(construct_md_array(NULL, NULL, 1, dims, lbs,
