@@ -1362,13 +1362,10 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 
 	/* Получаем параметр nsamples */
 	if (PG_ARGISNULL(2))
-		nsamples = 0;			/* По умолчанию 0 - пустой массив */
+		nsamples = 0;
 	else
 		nsamples = PG_GETARG_INT32(2);
 
-	/*
-	 * Инициализируем или получаем существующее состояние
-	 */
 	if (PG_ARGISNULL(0))
 		state = initReservoirState(arg_type, nsamples, aggcontext);
 	else
