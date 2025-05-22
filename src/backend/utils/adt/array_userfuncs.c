@@ -59,7 +59,7 @@ typedef struct ArraySortCachedInfo
 } ArraySortCachedInfo;
 
 /*
- * ReservoirState - структура для хранения состояния reservoir sampling
+ * ReservoirState - structure for storing reservoir sampling state
  */
 typedef struct ReservoirState
 {
@@ -74,7 +74,7 @@ typedef struct ReservoirState
 } ReservoirState;
 
 /*
- * initReservoirState - инициализация состояния для reservoir sampling
+ * initReservoirState - initialize state for reservoir sampling
  */
 static ReservoirState *
 initReservoirState(Oid element_type, int32 nsamples, MemoryContext mcxt)
@@ -82,18 +82,18 @@ initReservoirState(Oid element_type, int32 nsamples, MemoryContext mcxt)
 	ReservoirState *result;
 
 	/*
-	 * Выделяем память для структуры состояния
+	 * Allocate memory for the state structure
 	 */
 	result = (ReservoirState *) MemoryContextAlloc(mcxt, sizeof(ReservoirState));
 
-	/* Инициализируем поля */
+	/* Initialize fields */
 	result->element_type = element_type;
-	result->nsamples = nsamples > 0 ? nsamples : 0; /* Защита от отрицательных значений */
+	result->nsamples = nsamples > 0 ? nsamples : 0; /* Protection against negative values */
 	result->processed = 0;
 	result->samples = initArrayResult(element_type, mcxt, false);
 	result->mcontext = mcxt;
 
-	/* Получаем информацию о типе элемента */
+	/* Get information about the element type */
 	get_typlenbyvalalign(element_type,
 						 &result->typlen,
 						 &result->typbyval,
@@ -1334,7 +1334,7 @@ array_agg_array_finalfn(PG_FUNCTION_ARGS)
 }
 
 /*
- * array_sample_reservoir_transfn - функция перехода для array_sample_reservoir
+ * array_sample_reservoir_transfn - transition function for array_sample_reservoir
  */
 Datum
 array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
@@ -1346,21 +1346,21 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	Oid			arg_type;
 	int32		nsamples;
 
-	/* Получаем тип первого аргумента */
+	/* Get the type of the first argument */
 	arg_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
 	if (arg_type == InvalidOid)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("could not determine input data type")));
 
-	/* Проверяем контекст вызова */
+	/* Check the call context */
 	if (!AggCheckCallContext(fcinfo, &aggcontext))
 	{
 		/* cannot be called directly because of internal-type argument */
 		elog(ERROR, "array_sample_reservoir_transfn called in non-aggregate context");
 	}
 
-	/* Получаем параметр nsamples */
+	/* Get the nsamples parameter */
 	if (PG_ARGISNULL(2))
 		nsamples = 0;
 	else
@@ -1371,23 +1371,23 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	else
 		state = (ReservoirState *) PG_GETARG_POINTER(0);
 
-	/* Пропускаем обработку, если nsamples <= 0 */
+	/* Skip processing if nsamples <= 0 */
 	if (state->nsamples <= 0)
 	{
 		PG_RETURN_POINTER(state);
 	}
 	
-	/* Получаем элемент */
+	/* Get the element */
 	isNull = PG_ARGISNULL(1);
 	if (!isNull)
 		elem = PG_GETARG_DATUM(1);
 	else
 		elem = (Datum) 0;
 	
-	/* Реализация алгоритма reservoir sampling */
+	/* Implementation of the reservoir sampling algorithm */
 	if (state->processed < state->nsamples)
 	{
-		/* Первые nsamples элементов добавляем напрямую */
+		/* Add the first nsamples elements directly */
 		state->samples = accumArrayResult(state->samples,
 										  elem,
 										  isNull,
@@ -1396,16 +1396,16 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* Для следующих элементов используем вероятностный алгоритм */
-		/* Генерируем случайное число [0, 1) и проверяем вероятность включения элемента */
+		/* For subsequent elements, use a probabilistic algorithm */
+		/* Generate a random number [0, 1) and check the probability of including the element */
 		if (pg_prng_double(&pg_global_prng_state) < (double) state->nsamples / (double) (state->processed + 1))
 		{
-			/* Выбираем случайный элемент из резервуара для замены */
+			/* Select a random element from the reservoir for replacement */
 			int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state->nsamples - 1);
 			
 			/* 
-			 * Создаем временный массив для новых значений и копируем туда все
-			 * кроме j-го элемента
+			 * Create a temporary array for new values and copy everything
+			 * except the j-th element
 			 */
 			ArrayBuildState *newsamples = initArrayResult(state->element_type, aggcontext, false);
 			
@@ -1421,7 +1421,7 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					/* На место j добавляем новый элемент */
+					/* Add the new element in place of j */
 					newsamples = accumArrayResult(newsamples,
 												 elem,
 												 isNull,
@@ -1430,13 +1430,13 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 				}
 			}
 			
-			/* Заменяем массив на новый */
+			/* Replace the array with the new one */
 			state->samples = newsamples;
 		}
 	}
 
 	/*
-	 * Увеличиваем счетчик обработанных элементов
+	/* Increment the counter of processed elements */
 	 */
 	state->processed++;
 
@@ -1444,7 +1444,7 @@ array_sample_reservoir_transfn(PG_FUNCTION_ARGS)
 }
 
 /*
- * array_sample_reservoir_combine - функция комбинирования для array_sample_reservoir
+ * array_sample_reservoir_combine - combine function for array_sample_reservoir
  */
 Datum
 array_sample_reservoir_combine(PG_FUNCTION_ARGS)
@@ -1462,24 +1462,24 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	state2 = PG_ARGISNULL(1) ? NULL : (ReservoirState *) PG_GETARG_POINTER(1);
 
 	/*
-	 * Если оба состояния NULL, просто возвращаем
+	/* If both states are NULL, just return NULL */
 	 * NULL
 	 */
 	if (state1 == NULL && state2 == NULL)
 		PG_RETURN_NULL();
 
 	/*
-	 * Если одно из состояний NULL, возвращаем другое
+	/* If one of the states is NULL, return the other */
 	 */
 	if (state1 == NULL)
 	{
 		/*
-		 * Создаем копию state2 в правильном контексте
+		/* Create a copy of state2 in the correct context */
 		 */
 		result = initReservoirState(state2->element_type, state2->nsamples, agg_context);
 		result->processed = state2->processed;
 
-		/* Копируем элементы из state2 */
+		/* Copy elements from state2 */
 		if (state2->samples->nelems > 0)
 		{
 			for (i = 0; i < state2->samples->nelems; i++)
@@ -1507,32 +1507,32 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 	 */
 
 	/*
-	 * Если nsamples в state1 равно 0, просто возвращаем пустое состояние
+	/* If nsamples in state1 is 0, just return the empty state */
 	 */
 	if (state1->nsamples <= 0)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * Обновляем общее количество обработанных элементов
+	/* Update the total number of processed elements */
 	 */
 	state1->processed += state2->processed;
 
 	/*
-	 * Если state2 не содержит элементов, просто возвращаем
+	/* If state2 contains no elements, just return state1 */
 	 * state1
 	 */
 	if (state2->samples->nelems <= 0)
 		PG_RETURN_POINTER(state1);
 
 	/*
-	 * Добавляем элементы из state2 в state1 с учетом вероятности
+	/* Add elements from state2 to state1 based on probability */
 	 */
 	for (i = 0; i < state2->samples->nelems; i++)
 	{
 		if (state1->samples->nelems < state1->nsamples)
 		{
 			/*
-			 * Если в state1 еще есть место, добавляем элемент
+			/* If there's still room in state1, add the element */
 			 */
 			state1->samples = accumArrayResult(state1->samples,
 											   state2->samples->dvalues[i],
@@ -1543,18 +1543,18 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 		else
 		{
 			/*
-			 * Иначе добавляем с вероятностью
+			 * Otherwise, add with probability
 			 * nsamples / processed
 			 */
-			/* Генерируем случайное число [0, 1) и проверяем вероятность включения элемента */
+			/* Generate a random number [0, 1) and check the probability of including the element */
 			if (pg_prng_double(&pg_global_prng_state) < (double) state1->nsamples / (double) (state1->processed + 1))
 			{
 				/* Выбираем случайный элемент из резервуара для замены */
 				int64		j = (int64) pg_prng_uint64_range(&pg_global_prng_state, 0, state1->nsamples - 1);
 				
 				/* 
-				 * Создаем временный массив для новых значений и копируем туда все
-				 * кроме j-го элемента
+				 * Create a temporary array for new values and copy everything
+				 * except the j-th element
 				 */
 				ArrayBuildState *newsamples = initArrayResult(state1->element_type, agg_context, false);
 				
@@ -1570,7 +1570,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 					}
 					else
 					{
-						/* На место j добавляем элемент из state2 */
+						/* Add the element from state2 in place of j */
 						newsamples = accumArrayResult(newsamples,
 													 state2->samples->dvalues[i],
 													 state2->samples->dnulls[i],
@@ -1579,7 +1579,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 					}
 				}
 				
-				/* Заменяем массив на новый */
+				/* Replace the array with the new one */
 				state1->samples = newsamples;
 			}
 		}
@@ -1589,7 +1589,7 @@ array_sample_reservoir_combine(PG_FUNCTION_ARGS)
 }
 
 /*
- * array_sample_reservoir_serialize - функция сериализации для array_sample_reservoir
+ * array_sample_reservoir_serialize - serialization function for array_sample_reservoir
  */
 Datum
 array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
@@ -1599,14 +1599,14 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	bytea	   *result;
 	int			i;
 
-	/* Проверяем контекст вызова */
+	/* Check the call context */
 	Assert(AggCheckCallContext(fcinfo, NULL));
 
 	state = (ReservoirState *) PG_GETARG_POINTER(0);
 
 	pq_begintypsend(&buf);
 
-	/* Сериализуем поля структуры ReservoirState */
+	/* Serialize fields of the ReservoirState structure */
 	pq_sendint32(&buf, state->element_type);
 	pq_sendint32(&buf, state->nsamples);
 	pq_sendint64(&buf, state->processed);
@@ -1615,16 +1615,16 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 	pq_sendbyte(&buf, state->typalign);
 
 	/*
-	 * Сериализуем количество элементов в
+	 * Serialize the number of elements in
 	 * samples
 	 */
 	pq_sendint32(&buf, state->samples->nelems);
 
-	/* Сериализуем флаги NULL */
+	/* Serialize NULL flags */
 	pq_sendbytes(&buf, state->samples->dnulls, sizeof(bool) * state->samples->nelems);
 
 	/*
-	 * Сериализуем значения, аналогично
+	 * Serialize values, similar to
 	 * array_agg_serialize
 	 */
 	if (state->typbyval)
@@ -1636,8 +1636,8 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 		SerialIOData *iodata;
 
 		/*
-		 * Избегаем повторных поисков в каталоге для функции
-		 * typsend
+		 * Avoid repeated catalog lookups for the
+		 * typsend function
 		 */
 		iodata = (SerialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
@@ -1675,7 +1675,7 @@ array_sample_reservoir_serialize(PG_FUNCTION_ARGS)
 }
 
 /*
- * array_sample_reservoir_deserialize - функция десериализации для array_sample_reservoir
+ * array_sample_reservoir_deserialize - deserialization function for array_sample_reservoir
  */
 Datum
 array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
@@ -1699,12 +1699,12 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	sstate = PG_GETARG_BYTEA_PP(0);
 
 	/*
-	 * Инициализируем StringInfo для чтения сериализованных данных
+	 * Initialize StringInfo for reading serialized data
 	 */
 	initReadOnlyStringInfo(&buf, VARDATA_ANY(sstate),
 						   VARSIZE_ANY_EXHDR(sstate));
 
-	/* Десериализуем поля структуры ReservoirState */
+	/* Deserialize fields of the ReservoirState structure */
 	element_type = pq_getmsgint(&buf, 4);
 	nsamples = pq_getmsgint(&buf, 4);
 	processed = pq_getmsgint64(&buf);
@@ -1713,26 +1713,26 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	typalign = pq_getmsgbyte(&buf);
 
 	/*
-	 * Десериализуем количество элементов в
+	 * Deserialize the number of elements in
 	 * samples
 	 */
 	nelems = pq_getmsgint(&buf, 4);
 
-	/* Создаем новое состояние */
+	/* Create a new state */
 	result = initReservoirState(element_type, nsamples, CurrentMemoryContext);
 	result->processed = processed;
 	result->typlen = typlen;
 	result->typbyval = typbyval;
 	result->typalign = typalign;
 
-	/* Десериализуем флаги NULL */
+	/* Deserialize NULL flags */
 	temp = pq_getmsgbytes(&buf, sizeof(bool) * nelems);
 
-	/* Десериализуем значения */
+	/* Deserialize values */
 	if (typbyval)
 	{
 		/*
-		 * Для типов по значению просто копируем данные
+		 * For pass-by-value types, simply copy the data
 		 */
 		Datum	   *values = (Datum *) pq_getmsgbytes(&buf, sizeof(Datum) * nelems);
 
@@ -1754,13 +1754,13 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 	else
 	{
 		/*
-		 * Для типов по ссылке используем функцию приема
+		 * For pass-by-reference types, use the receive function
 		 */
 		DeserialIOData *iodata;
 
 		/*
-		 * Избегаем повторных поисков в каталоге для функции
-		 * typreceive
+		 * Avoid repeated catalog lookups for the
+		 * typreceive function
 		 */
 		iodata = (DeserialIOData *) fcinfo->flinfo->fn_extra;
 		if (iodata == NULL)
@@ -1802,14 +1802,14 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 							 errmsg("insufficient data left in message")));
 
 				/*
-				 * Инициализируем StringInfo для элемента
+				 * Initialize StringInfo for the element
 				 */
 				initReadOnlyStringInfo(&elem_buf, &buf.data[buf.cursor], itemlen);
 
 				buf.cursor += itemlen;
 
 				/*
-				 * Вызываем функцию приема для элемента
+				 * Call the receive function for the element
 				 */
 				value = ReceiveFunctionCall(&iodata->typreceive,
 											&elem_buf,
@@ -1831,7 +1831,7 @@ array_sample_reservoir_deserialize(PG_FUNCTION_ARGS)
 }
 
 /*
- * array_sample_reservoir_finalfn - финальная функция для array_sample_reservoir
+ * array_sample_reservoir_finalfn - final function for array_sample_reservoir
  */
 Datum
 array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
@@ -1841,7 +1841,7 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 	int			dims[1];
 	int			lbs[1];
 
-	/* Проверяем контекст вызова */
+	/* Check the call context */
 	Assert(AggCheckCallContext(fcinfo, NULL));
 
 	state = PG_ARGISNULL(0) ? NULL : (ReservoirState *) PG_GETARG_POINTER(0);
@@ -1849,7 +1849,7 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 	if (state == NULL || state->nsamples <= 0 || state->samples->nelems <= 0)
 	{
 		/*
-		 * Если состояние NULL или пусто, возвращаем пустой массив
+		 * If the state is NULL or empty, return an empty array
 		 */
 		Oid			element_type;
 
@@ -1866,7 +1866,7 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 		dims[0] = 0;
 		lbs[0] = 1;
 
-		/* Создаем пустой массив */
+		/* Create an empty array */
 		{
 			int16		typlen;
 			bool		typbyval;
@@ -1884,7 +1884,7 @@ array_sample_reservoir_finalfn(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* Создаем массив из элементов в samples */
+		/* Create an array from elements in samples */
 		dims[0] = state->samples->nelems;
 		lbs[0] = 1;
 
