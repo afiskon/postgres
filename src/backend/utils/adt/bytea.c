@@ -15,13 +15,19 @@
 #include "postgres.h"
 
 #include "access/detoast.h"
-#include "catalog/pg_collation.h"
+#include "catalog/pg_collation_d.h"
+#include "catalog/pg_type_d.h"
 #include "common/int.h"
-#include "funcapi.h"
+#include "fmgr.h"
 #include "libpq/pqformat.h"
+#include "port/pg_bitutils.h"
 #include "utils/builtins.h"
 #include "utils/bytea.h"
+#include "utils/fmgrprotos.h"
+#include "utils/memutils.h"
+#include "utils/sortsupport.h"
 #include "utils/varlena.h"
+#include "varatt.h"
 
 /* GUC variable */
 int			bytea_output = BYTEA_OUTPUT_HEX;
