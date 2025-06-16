@@ -32,37 +32,9 @@
 /* GUC variable */
 int			bytea_output = BYTEA_OUTPUT_HEX;
 
-static StringInfo
-			makeStringAggState(FunctionCallInfo fcinfo);
 static bytea *bytea_catenate(bytea *t1, bytea *t2);
 static bytea *bytea_substring(Datum str, int S, int L, bool length_not_specified);
 static bytea *bytea_overlay(bytea *t1, bytea *t2, int sp, int sl);
-
-
-/* subroutine to initialize state */
-static StringInfo
-makeStringAggState(FunctionCallInfo fcinfo)
-{
-	StringInfo	state;
-	MemoryContext aggcontext;
-	MemoryContext oldcontext;
-
-	if (!AggCheckCallContext(fcinfo, &aggcontext))
-	{
-		/* cannot be called directly because of internal-type argument */
-		elog(ERROR, "bytea_string_agg_transfn called in non-aggregate context");
-	}
-
-	/*
-	 * Create state in aggregate context.  It'll stay there across subsequent
-	 * calls.
-	 */
-	oldcontext = MemoryContextSwitchTo(aggcontext);
-	state = makeStringInfo();
-	MemoryContextSwitchTo(oldcontext);
-
-	return state;
-}
 
 /*
  * bytea_catenate
@@ -449,7 +421,23 @@ bytea_string_agg_transfn(PG_FUNCTION_ARGS)
 		 */
 		if (state == NULL)
 		{
-			state = makeStringAggState(fcinfo);
+			MemoryContext aggcontext;
+			MemoryContext oldcontext;
+
+			if (!AggCheckCallContext(fcinfo, &aggcontext))
+			{
+				/* cannot be called directly because of internal-type argument */
+				elog(ERROR, "bytea_string_agg_transfn called in non-aggregate context");
+			}
+
+			/*
+			 * Create state in aggregate context.  It'll stay there across subsequent
+			 * calls.
+			 */
+			oldcontext = MemoryContextSwitchTo(aggcontext);
+			state = makeStringInfo();
+			MemoryContextSwitchTo(oldcontext);
+
 			isfirst = true;
 		}
 
