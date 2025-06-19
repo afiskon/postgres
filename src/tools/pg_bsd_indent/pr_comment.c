@@ -96,8 +96,7 @@ pr_comment(void)
 
     /* Figure where to align and how to treat the comment */
 
-    if (ps.col_1 && !format_col1_comments) {	/* if comment starts in column
-						 * 1 it should not be touched */
+    if (ps.col_1 /* && !format_col1_comments */) {
 	ps.box_com = true;
 	break_delim = false;
 	ps.com_col = 1;
