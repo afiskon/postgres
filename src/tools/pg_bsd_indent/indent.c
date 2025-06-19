@@ -1184,6 +1184,41 @@ check_type:
 				 * character will cause the line to be printed */
 
 	case comment:		/* we have gotten a / followed by * this is a biggie */
+	    /*
+	     * Force line break for column-1 multiline comments by inserting
+	     * a newline into the buffer right after slash-star. This makes pr_comment()
+	     * treat it as a block comment that should be formatted with line breaks.
+	     * Ignore "*****" and "-----" comments.
+	     */
+	    if (ps.col_1 && *buf_ptr != '\n' && *buf_ptr != '-' && *buf_ptr != '*') {
+		char *t_ptr;
+		bool is_single_line = false;
+
+		/* Check if comment end star-slash appears on the same line */
+		t_ptr = buf_ptr;
+		while (*t_ptr != '\0' && *t_ptr != '\n') {
+		    if (t_ptr >= buf_end)
+			fill_buffer();
+		    if (t_ptr[0] == '*' && t_ptr[1] == '/') {
+			is_single_line = true;
+			break;
+		    }
+		    t_ptr++;
+		}
+
+		/* Only transform if it's NOT a single-line comment */
+		if (!is_single_line) {
+		    /* Insert newline and star right after slash-star by shifting buffer content */
+		    if (buf_end < in_buffer_limit - 3) {
+			/* Make room for newline + space + star */
+			memmove(buf_ptr + 3, buf_ptr, buf_end - buf_ptr);
+			*buf_ptr = '\n';
+			*(buf_ptr + 1) = ' ';
+			*(buf_ptr + 2) = '*';
+			buf_end += 3;
+		    }
+		}
+	    }
 	    pr_comment();
 	    break;
 	}			/* end of big switch stmt */
