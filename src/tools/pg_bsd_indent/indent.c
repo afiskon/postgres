@@ -1192,22 +1192,29 @@ check_type:
 	     */
 	    if (ps.col_1 && *buf_ptr != '\n' && *buf_ptr != '-' && *buf_ptr != '*') {
 		char *t_ptr;
-		bool is_single_line = false;
+		bool skip = false;
 
-		/* Check if comment end star-slash appears on the same line */
+		/* Check if comment should be skipped */
 		t_ptr = buf_ptr;
-		while (*t_ptr != '\0' && *t_ptr != '\n') {
+		while (*t_ptr != '\0') {
 		    if (t_ptr >= buf_end)
 			fill_buffer();
+
 		    if (t_ptr[0] == '*' && t_ptr[1] == '/') {
-			is_single_line = true;
+			skip = true; /* star-slash appears on the same line */
 			break;
 		    }
+
+		    if (t_ptr[0] == '\n') {
+			if (t_ptr[1] == ' ' && t_ptr[2] != '*')
+			    skip = true; /* next line doesn't start with " *" */
+			break;
+		    }
+
 		    t_ptr++;
 		}
 
-		/* Only transform if it's NOT a single-line comment */
-		if (!is_single_line) {
+		if (!skip) {
 		    /* Insert newline and star right after slash-star by shifting buffer content */
 		    if (buf_end < in_buffer_limit - 3) {
 			/* Make room for newline + space + star */

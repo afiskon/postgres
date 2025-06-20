@@ -1650,7 +1650,8 @@ varstr_cmp(const char *arg1, int len1, const char *arg2, int len2, Oid collid)
 	return result;
 }
 
-/* text_cmp()
+/*
+ * text_cmp()
  * Internal comparison function for text strings.
  * Returns -1, 0 or 1
  */
@@ -3420,7 +3421,8 @@ bytea_reverse(PG_FUNCTION_ARGS)
 }
 
 
-/* text_name()
+/*
+ * text_name()
  * Converts a text type to a Name type.
  */
 Datum
@@ -3443,7 +3445,8 @@ text_name(PG_FUNCTION_ARGS)
 	PG_RETURN_NAME(result);
 }
 
-/* name_text()
+/*
+ * name_text()
  * Converts a Name type to a text type.
  */
 Datum
