@@ -111,7 +111,6 @@ variable_char	[A-Za-z\200-\377_0-9]
 
 commands		("a"|"bind"|"bind_named"|"C"|"c"|"connect"|"cd"|"close_prepared"|"conninfo"|[Cc][Oo][Pp][Yy]|"copyright"|"crosstabview"|"d"[a-zA-Z+]*|"e"|"edit"|"ef"|"ev"|"echo"|"qecho"|"warn"|"elif"|"else"|"endif"|"endpipeline"|"encoding"|"errverbose"|"f"|"flush"|"flushrequest"|"g"|"gx"|"gdesc"|"getenv"|"getresults"|"gexec"|"gset"|"h"|"help"|"H"|"html"|"i"|"include"|"ir"|"include_relative"|"if"|"l"|"list"|"lx"|"listx"|"l+"|"list+"|"lx+"|"listx+"|"l+x"|"list+x"|"lo_"[a-zA-Z_]*|"o"|"out"|"p"|"print"|"parse"|"password"|"prompt"|"pset"|"q"|"quit"|"r"|"reset"|"s"|"sendpipeline"|"set"|"setenv"|"sf"|"sf+"|"sv"|"sv+"|"startpipeline"|"syncpipeline"|"t"|"T"|"timing"|"unset"|"w"|"write"|"watch"|"x"|"z"|"zS"|"zx"|"zSx"|"zxS"|"!"|"?")
 
-
 other			.
 
 %%
