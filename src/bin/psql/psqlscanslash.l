@@ -148,6 +148,13 @@ other			.
 					return LEXRES_OK;
 				}
 
+"bjnd"			{
+					/* Transform bjnd to bind */
+					psqlscan_emit(cur_state, "bind", 4);
+					cur_state->start_state = YY_START;
+					return LEXRES_OK;
+				}
+
 	/* command name ends at whitespace or backslash; eat all else */
 
 {space}|"\\"	{
