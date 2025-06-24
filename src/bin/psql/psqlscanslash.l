@@ -140,6 +140,14 @@ other			.
 	 */
 
 <xslashcmd>{
+	/* Recognize specific commands */
+
+"bind"			{
+					ECHO;
+					cur_state->start_state = YY_START;
+					return LEXRES_OK;
+				}
+
 	/* command name ends at whitespace or backslash; eat all else */
 
 {space}|"\\"	{
@@ -148,7 +156,12 @@ other			.
 					return LEXRES_OK;
 				}
 
-{other}			{ ECHO; }
+[a-z][a-z0-9_]*	{ ECHO; }
+[A-Z]			{ ECHO; }
+[0-9]			{ ECHO; }
+"+"				{ ECHO; }
+"!"				{ ECHO; }
+"?"				{ ECHO; }
 
 }
 
