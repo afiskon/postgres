@@ -163,12 +163,7 @@ other			.
 					return LEXRES_OK;
 				}
 
-[a-z][a-z0-9_]*	{ ECHO; }
-[A-Z]			{ ECHO; }
-[0-9]			{ ECHO; }
-"+"				{ ECHO; }
-"!"				{ ECHO; }
-"?"				{ ECHO; }
+[a-zA-Z0-9_+!?]*	{ ECHO; }
 
 }
 
