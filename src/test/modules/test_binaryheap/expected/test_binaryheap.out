@@ -1,0 +1,34 @@
+CREATE EXTENSION test_binaryheap;
+-- Test edge cases
+SELECT test_binary_heap(1);
+ test_binary_heap 
+------------------
+ 
+(1 row)
+
+SELECT test_binary_heap(2);
+ test_binary_heap 
+------------------
+ 
+(1 row)
+
+SELECT test_binary_heap(3);
+ test_binary_heap 
+------------------
+ 
+(1 row)
+
+-- Test with small heap
+SELECT test_binary_heap(10);
+ test_binary_heap 
+------------------
+ 
+(1 row)
+
+-- Test with larger heap
+SELECT test_binary_heap(100);
+ test_binary_heap 
+------------------
+ 
+(1 row)
+
