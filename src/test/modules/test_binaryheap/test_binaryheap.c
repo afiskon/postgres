@@ -21,9 +21,9 @@
 PG_MODULE_MAGIC;
 
 /* Callback function types */
-typedef binaryheap *(*heap_create_func)(int capacity);
-typedef void (*heap_verify_func)(binaryheap *heap);
-typedef int (*heap_expected_first_func)(binaryheap *heap);
+typedef binaryheap *(*heap_create_func) (int capacity);
+typedef void (*heap_verify_func) (binaryheap *heap);
+typedef int (*heap_expected_first_func) (binaryheap *heap);
 
 /* Comparator for max-heap */
 static int
@@ -57,13 +57,14 @@ create_min_heap(int capacity)
 static int
 get_max_value_from_heap(binaryheap *heap)
 {
-	int		i;
-	int		size = binaryheap_size(heap);
-	int		max_val = DatumGetInt32(binaryheap_get_node(heap, 0));
+	int			i;
+	int			size = binaryheap_size(heap);
+	int			max_val = DatumGetInt32(binaryheap_get_node(heap, 0));
 
 	for (i = 1; i < size; i++)
 	{
-		int val = DatumGetInt32(binaryheap_get_node(heap, i));
+		int			val = DatumGetInt32(binaryheap_get_node(heap, i));
+
 		if (val > max_val)
 			max_val = val;
 	}
@@ -74,13 +75,14 @@ get_max_value_from_heap(binaryheap *heap)
 static int
 get_min_value_from_heap(binaryheap *heap)
 {
-	int		i;
-	int		size = binaryheap_size(heap);
-	int		min_val = DatumGetInt32(binaryheap_get_node(heap, 0));
+	int			i;
+	int			size = binaryheap_size(heap);
+	int			min_val = DatumGetInt32(binaryheap_get_node(heap, 0));
 
 	for (i = 1; i < size; i++)
 	{
-		int val = DatumGetInt32(binaryheap_get_node(heap, i));
+		int			val = DatumGetInt32(binaryheap_get_node(heap, i));
+
 		if (val < min_val)
 			min_val = val;
 	}
@@ -92,7 +94,9 @@ static int *
 gen_permutation(int size)
 {
 	int		   *arr;
-	int			i, j, temp;
+	int			i,
+				j,
+				temp;
 
 	arr = (int *) palloc(size * sizeof(int));
 
@@ -101,7 +105,7 @@ gen_permutation(int size)
 
 	for (i = 0; i < size; i++)
 	{
-		j = pg_prng_uint64_range(&pg_global_prng_state, 0, size-1);
+		j = pg_prng_uint64_range(&pg_global_prng_state, 0, size - 1);
 		temp = arr[i];
 		arr[i] = arr[j];
 		arr[j] = temp;
@@ -213,8 +217,9 @@ test_heap_basic(int size, heap_create_func create_heap, heap_verify_func verify_
 	/* Remove all elements and verify each one */
 	for (i = 0; i < size; i++)
 	{
-		int expected = expected_first(heap);
-		int actual = DatumGetInt32(binaryheap_remove_first(heap));
+		int			expected = expected_first(heap);
+		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
+
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
 		verify_heap(heap);
@@ -260,8 +265,9 @@ test_heap_build(int size, heap_create_func create_heap, heap_verify_func verify_
 	/* Remove all elements and verify each one */
 	while (!binaryheap_empty(heap))
 	{
-		int expected = expected_first(heap);
-		int actual = DatumGetInt32(binaryheap_remove_first(heap));
+		int			expected = expected_first(heap);
+		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
+
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
 		verify_heap(heap);
@@ -277,7 +283,8 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 	binaryheap *heap;
 	int		   *permutation;
 	int			i;
-	int			idx, remove_count;
+	int			idx,
+				remove_count;
 
 	heap = create_heap(size);
 
@@ -303,8 +310,9 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 	/* Remove all remaining elements and verify each one */
 	while (!binaryheap_empty(heap))
 	{
-		int expected = expected_first(heap);
-		int actual = DatumGetInt32(binaryheap_remove_first(heap));
+		int			expected = expected_first(heap);
+		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
+
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
 		verify_heap(heap);
@@ -339,7 +347,10 @@ test_heap_replace_first(int size, heap_create_func create_heap, heap_verify_func
 	binaryheap_replace_first(heap, Int32GetDatum(size + 10));
 	verify_heap(heap);
 
-	/* Test that binaryheap_first() returns expected value after second replacement */
+	/*
+	 * Test that binaryheap_first() returns expected value after second
+	 * replacement
+	 */
 	if (DatumGetInt32(binaryheap_first(heap)) != expected_first(heap))
 		elog(ERROR, "first element should be %d after replacement, got %d",
 			 expected_first(heap), DatumGetInt32(binaryheap_first(heap)));
@@ -371,7 +382,7 @@ test_heap_duplicates(int size, heap_create_func create_heap, heap_verify_func ve
 	/* Remove all elements */
 	for (i = 0; i < size; i++)
 	{
-		int val = DatumGetInt32(binaryheap_remove_first(heap));
+		int			val = DatumGetInt32(binaryheap_remove_first(heap));
 
 		if (val != duplicate_value)
 			elog(ERROR, "all elements should be %d", duplicate_value);
