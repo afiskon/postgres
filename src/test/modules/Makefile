@@ -33,6 +33,7 @@ SUBDIRS = \
 		  test_pg_dump \
 		  test_predtest \
 		  test_radixtree \
+		  test_binaryheap \
 		  test_rbtree \
 		  test_regex \
 		  test_resowner \
