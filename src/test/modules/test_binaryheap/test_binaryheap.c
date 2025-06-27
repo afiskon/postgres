@@ -3,6 +3,10 @@
  * test_binaryheap.c
  *		Test correctness of binary heap implementation.
  *
+ * We only test max-heap here. The only difference between max-heap and
+ * min-heap is in the comparator, so testing both would really only serve
+ * to test the test comparator.
+ *
  * Copyright (c) 2025, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
@@ -20,11 +24,6 @@
 
 PG_MODULE_MAGIC;
 
-/* Callback function types */
-typedef binaryheap *(*heap_create_func) (int capacity);
-typedef void (*heap_verify_func) (binaryheap *heap);
-typedef int (*heap_expected_first_func) (binaryheap *heap);
-
 /* Comparator for max-heap */
 static int
 max_heap_cmp_int(Datum a, Datum b, void *arg)
@@ -32,25 +31,11 @@ max_heap_cmp_int(Datum a, Datum b, void *arg)
 	return DatumGetInt32(a) - DatumGetInt32(b);
 }
 
-/* Comparator for min-heap */
-static int
-min_heap_cmp_int(Datum a, Datum b, void *arg)
-{
-	return DatumGetInt32(b) - DatumGetInt32(a);
-}
-
 /* Create a max-heap of integers */
 static binaryheap *
 create_max_heap(int capacity)
 {
 	return binaryheap_allocate(capacity, max_heap_cmp_int, NULL);
-}
-
-/* Create a min-heap of integers */
-static binaryheap *
-create_min_heap(int capacity)
-{
-	return binaryheap_allocate(capacity, min_heap_cmp_int, NULL);
 }
 
 /* Find maximum value in heap (for max-heap expected first) */
@@ -69,24 +54,6 @@ get_max_value_from_heap(binaryheap *heap)
 			max_val = val;
 	}
 	return max_val;
-}
-
-/* Find minimum value in heap (for min-heap expected first) */
-static int
-get_min_value_from_heap(binaryheap *heap)
-{
-	int			i;
-	int			size = binaryheap_size(heap);
-	int			min_val = DatumGetInt32(binaryheap_get_node(heap, 0));
-
-	for (i = 1; i < size; i++)
-	{
-		int			val = DatumGetInt32(binaryheap_get_node(heap, i));
-
-		if (val < min_val)
-			min_val = val;
-	}
-	return min_val;
 }
 
 /* Generate a random permutation of the integers 0..size-1 */
@@ -147,48 +114,17 @@ verify_max_heap_property(binaryheap *heap)
 	}
 }
 
-/* Verify that a min-heap satisfies the heap property. */
-static void
-verify_min_heap_property(binaryheap *heap)
-{
-	int			i;
-	int			size = binaryheap_size(heap);
 
-	for (i = 0; i < size; i++)
-	{
-		int			left_child = 2 * i + 1;
-		int			right_child = 2 * i + 2;
-		int			parent_val = DatumGetInt32(binaryheap_get_node(heap, i));
-
-		if (left_child < size)
-		{
-			int			left_val = DatumGetInt32(binaryheap_get_node(heap, left_child));
-
-			if (parent_val > left_val)
-				elog(ERROR, "min-heap property violated: parent %d > left child %d",
-					 parent_val, left_val);
-		}
-
-		if (right_child < size)
-		{
-			int			right_val = DatumGetInt32(binaryheap_get_node(heap, right_child));
-
-			if (parent_val > right_val)
-				elog(ERROR, "min-heap property violated: parent %d > right child %d",
-					 parent_val, right_val);
-		}
-	}
-}
 
 /* Test basic heap operations */
 static void
-test_heap_basic(int size, heap_create_func create_heap, heap_verify_func verify_heap, heap_expected_first_func expected_first)
+test_heap_basic(int size)
 {
 	binaryheap *heap;
 	int		   *permutation;
 	int			i;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Test empty heap */
 	if (!binaryheap_empty(heap))
@@ -200,7 +136,7 @@ test_heap_basic(int size, heap_create_func create_heap, heap_verify_func verify_
 	for (i = 0; i < size; i++)
 	{
 		binaryheap_add(heap, Int32GetDatum(permutation[i]));
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 	pfree(permutation);
 
@@ -210,19 +146,19 @@ test_heap_basic(int size, heap_create_func create_heap, heap_verify_func verify_
 		elog(ERROR, "heap size should be %d, got %d", size, binaryheap_size(heap));
 
 	/* Test that binaryheap_first() returns expected value */
-	if (DatumGetInt32(binaryheap_first(heap)) != expected_first(heap))
+	if (DatumGetInt32(binaryheap_first(heap)) != get_max_value_from_heap(heap))
 		elog(ERROR, "heap first element should be %d, got %d",
-			 expected_first(heap), DatumGetInt32(binaryheap_first(heap)));
+			 get_max_value_from_heap(heap), DatumGetInt32(binaryheap_first(heap)));
 
 	/* Remove all elements and verify each one */
 	for (i = 0; i < size; i++)
 	{
-		int			expected = expected_first(heap);
+		int			expected = get_max_value_from_heap(heap);
 		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
 
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 
 	if (!binaryheap_empty(heap))
@@ -233,13 +169,13 @@ test_heap_basic(int size, heap_create_func create_heap, heap_verify_func verify_
 
 /* Test unordered add and build operations */
 static void
-test_heap_build(int size, heap_create_func create_heap, heap_verify_func verify_heap, heap_expected_first_func expected_first)
+test_heap_build(int size)
 {
 	binaryheap *heap;
 	int		   *permutation;
 	int			i;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Add elements in unordered fashion */
 	permutation = gen_permutation(size);
@@ -255,22 +191,22 @@ test_heap_build(int size, heap_create_func create_heap, heap_verify_func verify_
 	binaryheap_build(heap);
 
 	/* Now heap property should hold */
-	verify_heap(heap);
+	verify_max_heap_property(heap);
 
 	/* Test that binaryheap_first() returns expected value after build */
-	if (DatumGetInt32(binaryheap_first(heap)) != expected_first(heap))
+	if (DatumGetInt32(binaryheap_first(heap)) != get_max_value_from_heap(heap))
 		elog(ERROR, "heap first element should be %d after build, got %d",
-			 expected_first(heap), DatumGetInt32(binaryheap_first(heap)));
+			 get_max_value_from_heap(heap), DatumGetInt32(binaryheap_first(heap)));
 
 	/* Remove all elements and verify each one */
 	while (!binaryheap_empty(heap))
 	{
-		int			expected = expected_first(heap);
+		int			expected = get_max_value_from_heap(heap);
 		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
 
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 
 	binaryheap_free(heap);
@@ -278,7 +214,7 @@ test_heap_build(int size, heap_create_func create_heap, heap_verify_func verify_
 
 /* Test remove_node functionality */
 static void
-test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func verify_heap, heap_expected_first_func expected_first)
+test_heap_remove_node(int size)
 {
 	binaryheap *heap;
 	int		   *permutation;
@@ -286,7 +222,7 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 	int			idx,
 				remove_count;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Add elements */
 	permutation = gen_permutation(size);
@@ -300,7 +236,7 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 	{
 		idx = pg_prng_uint64_range(&pg_global_prng_state, 0, binaryheap_size(heap) - 1);
 		binaryheap_remove_node(heap, idx);
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 
 	if (binaryheap_size(heap) != size - remove_count)
@@ -310,12 +246,12 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 	/* Remove all remaining elements and verify each one */
 	while (!binaryheap_empty(heap))
 	{
-		int			expected = expected_first(heap);
+		int			expected = get_max_value_from_heap(heap);
 		int			actual = DatumGetInt32(binaryheap_remove_first(heap));
 
 		if (actual != expected)
 			elog(ERROR, "remove_first should return %d, got %d", expected, actual);
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 
 	binaryheap_free(heap);
@@ -323,12 +259,12 @@ test_heap_remove_node(int size, heap_create_func create_heap, heap_verify_func v
 
 /* Test replace_first functionality */
 static void
-test_heap_replace_first(int size, heap_create_func create_heap, heap_verify_func verify_heap, heap_expected_first_func expected_first)
+test_heap_replace_first(int size)
 {
 	binaryheap *heap;
 	int			i;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Add elements 0 to size-1 */
 	for (i = 0; i < size; i++)
@@ -336,43 +272,43 @@ test_heap_replace_first(int size, heap_create_func create_heap, heap_verify_func
 
 	/* Replace first with a middle value */
 	binaryheap_replace_first(heap, Int32GetDatum(size / 2));
-	verify_heap(heap);
+	verify_max_heap_property(heap);
 
 	/* Test that binaryheap_first() returns expected value after replacement */
-	if (DatumGetInt32(binaryheap_first(heap)) != expected_first(heap))
+	if (DatumGetInt32(binaryheap_first(heap)) != get_max_value_from_heap(heap))
 		elog(ERROR, "first element should be %d after replacement, got %d",
-			 expected_first(heap), DatumGetInt32(binaryheap_first(heap)));
+			 get_max_value_from_heap(heap), DatumGetInt32(binaryheap_first(heap)));
 
 	/* Replace first with an extreme value */
 	binaryheap_replace_first(heap, Int32GetDatum(size + 10));
-	verify_heap(heap);
+	verify_max_heap_property(heap);
 
 	/*
 	 * Test that binaryheap_first() returns expected value after second
 	 * replacement
 	 */
-	if (DatumGetInt32(binaryheap_first(heap)) != expected_first(heap))
+	if (DatumGetInt32(binaryheap_first(heap)) != get_max_value_from_heap(heap))
 		elog(ERROR, "first element should be %d after replacement, got %d",
-			 expected_first(heap), DatumGetInt32(binaryheap_first(heap)));
+			 get_max_value_from_heap(heap), DatumGetInt32(binaryheap_first(heap)));
 
 	binaryheap_free(heap);
 }
 
 /* Test heap with duplicate values */
 static void
-test_heap_duplicates(int size, heap_create_func create_heap, heap_verify_func verify_heap)
+test_heap_duplicates(int size)
 {
 	binaryheap *heap;
 	int			i;
 	int			duplicate_value = 42;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Add the same value multiple times */
 	for (i = 0; i < size; i++)
 	{
 		binaryheap_add(heap, Int32GetDatum(duplicate_value));
-		verify_heap(heap);
+		verify_max_heap_property(heap);
 	}
 
 	/* All elements should be the same */
@@ -393,12 +329,12 @@ test_heap_duplicates(int size, heap_create_func create_heap, heap_verify_func ve
 
 /* Test heap reset functionality */
 static void
-test_heap_reset(int size, heap_create_func create_heap)
+test_heap_reset(int size)
 {
 	binaryheap *heap;
 	int			i;
 
-	heap = create_heap(size);
+	heap = create_max_heap(size);
 
 	/* Add some elements */
 	for (i = 0; i < size; i++)
@@ -439,20 +375,12 @@ test_binary_heap(PG_FUNCTION_ARGS)
 		elog(ERROR, "invalid size for test_binary_heap: %d", size);
 
 	/* Test max-heap */
-	test_heap_basic(size, create_max_heap, verify_max_heap_property, get_max_value_from_heap);
-	test_heap_build(size, create_max_heap, verify_max_heap_property, get_max_value_from_heap);
-	test_heap_remove_node(size, create_max_heap, verify_max_heap_property, get_max_value_from_heap);
-	test_heap_replace_first(size, create_max_heap, verify_max_heap_property, get_max_value_from_heap);
-	test_heap_duplicates(size, create_max_heap, verify_max_heap_property);
-	test_heap_reset(size, create_max_heap);
-
-	/* Test min-heap */
-	test_heap_basic(size, create_min_heap, verify_min_heap_property, get_min_value_from_heap);
-	test_heap_build(size, create_min_heap, verify_min_heap_property, get_min_value_from_heap);
-	test_heap_remove_node(size, create_min_heap, verify_min_heap_property, get_min_value_from_heap);
-	test_heap_replace_first(size, create_min_heap, verify_min_heap_property, get_min_value_from_heap);
-	test_heap_duplicates(size, create_min_heap, verify_min_heap_property);
-	test_heap_reset(size, create_min_heap);
+	test_heap_basic(size);
+	test_heap_build(size);
+	test_heap_remove_node(size);
+	test_heap_replace_first(size);
+	test_heap_duplicates(size);
+	test_heap_reset(size);
 
 	PG_RETURN_VOID();
 }
