@@ -912,3 +912,17 @@ SELECT unistr('wrong: \udb99\u0061');
 SELECT unistr('wrong: \U0000db99\U00000061');
 SELECT unistr('wrong: \U002FFFFF');
 SELECT unistr('wrong: \xyz');
+
+--
+-- Test bytea sortsupport
+--
+SET bytea_output TO hex;
+
+CREATE TABLE bytea_test(a INT, b bytea NOT NULL);
+INSERT INTO bytea_test (a, b) VALUES (1, ''), (2, '\x11'), (3, '\x22'), (4, '\x1122');
+
+SELECT t1.b, t2.b, t1.b < t2.b AS lt
+FROM bytea_test AS t1, bytea_test AS t2
+ORDER BY t1.b, t2.b;
+
+DROP TABLE bytea_test;

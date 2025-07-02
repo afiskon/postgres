@@ -2931,3 +2931,33 @@ ERROR:  invalid Unicode code point: 2FFFFF
 SELECT unistr('wrong: \xyz');
 ERROR:  invalid Unicode escape
 HINT:  Unicode escapes must be \XXXX, \+XXXXXX, \uXXXX, or \UXXXXXXXX.
+--
+-- Test bytea sortsupport
+--
+SET bytea_output TO hex;
+CREATE TABLE bytea_test(a INT, b bytea NOT NULL);
+INSERT INTO bytea_test (a, b) VALUES (1, ''), (2, '\x11'), (3, '\x22'), (4, '\x1122');
+SELECT t1.b, t2.b, t1.b < t2.b AS lt
+FROM bytea_test AS t1, bytea_test AS t2
+ORDER BY t1.b, t2.b;
+   b    |   b    | lt 
+--------+--------+----
+ \x     | \x     | f
+ \x     | \x11   | t
+ \x     | \x1122 | t
+ \x     | \x22   | t
+ \x11   | \x     | f
+ \x11   | \x11   | f
+ \x11   | \x1122 | t
+ \x11   | \x22   | t
+ \x1122 | \x     | f
+ \x1122 | \x11   | f
+ \x1122 | \x1122 | f
+ \x1122 | \x22   | t
+ \x22   | \x     | f
+ \x22   | \x11   | f
+ \x22   | \x1122 | f
+ \x22   | \x22   | f
+(16 rows)
+
+DROP TABLE bytea_test;
