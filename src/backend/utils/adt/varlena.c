@@ -1607,10 +1607,8 @@ bttextsortsupport(PG_FUNCTION_ARGS)
  * Includes locale support, and support for BpChar semantics (i.e. removing
  * trailing spaces before comparison).
  *
- * Relies on the assumption that text, VarChar, BpChar, and bytea all have the
- * same representation.  Callers that always use the C collation (e.g.
- * non-collatable type callers like bytea) may have NUL bytes in their strings;
- * this will not work with any other collation, though.
+ * Relies on the assumption that text, VarChar, and BpChar all have the
+ * same representation.
  */
 void
 varstr_sortsupport(SortSupport ssup, Oid typid, Oid collid)
@@ -2001,30 +1999,8 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 
 	/*
 	 * If we're using the C collation, use memcpy(), rather than strxfrm(), to
-	 * abbreviate keys.  The full comparator for the C locale is always
-	 * memcmp().  It would be incorrect to allow bytea callers (callers that
-	 * always force the C collation -- bytea isn't a collatable type, but this
-	 * approach is convenient) to use strxfrm().  This is because bytea
-	 * strings may contain NUL bytes.  Besides, this should be faster, too.
-	 *
-	 * More generally, it's okay that bytea callers can have NUL bytes in
-	 * strings because abbreviated cmp need not make a distinction between
-	 * terminating NUL bytes, and NUL bytes representing actual NULs in the
-	 * authoritative representation.  Hopefully a comparison at or past one
-	 * abbreviated key's terminating NUL byte will resolve the comparison
-	 * without consulting the authoritative representation; specifically, some
-	 * later non-NUL byte in the longer string can resolve the comparison
-	 * against a subsequent terminating NUL in the shorter string.  There will
-	 * usually be what is effectively a "length-wise" resolution there and
-	 * then.
-	 *
-	 * If that doesn't work out -- if all bytes in the longer string
-	 * positioned at or past the offset of the smaller string's (first)
-	 * terminating NUL are actually representative of NUL bytes in the
-	 * authoritative binary string (perhaps with some *terminating* NUL bytes
-	 * towards the end of the longer string iff it happens to still be small)
-	 * -- then an authoritative tie-breaker will happen, and do the right
-	 * thing: explicitly consider string length.
+	 * abbreviate keys.  The full comparator for the C locale is also
+	 * memcmp().  This should be faster than strxfrm().
 	 */
 	if (sss->collate_c)
 		memcpy(pres, authoritative_data, Min(len, max_prefix_bytes));
