@@ -2030,7 +2030,14 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 		statement_type = ECPGst_execute;
 	}
 	else
+	{
 		stmt->command = ecpg_strdup(query, lineno);
+		if (!stmt->command)
+		{
+			ecpg_do_epilogue(stmt);
+			return false;
+		}
+	}
 
 	stmt->name = NULL;
 
@@ -2043,6 +2050,11 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 		{
 			stmt->name = stmt->command;
 			stmt->command = ecpg_strdup(command, lineno);
+			if (!stmt->command)
+			{
+				ecpg_do_epilogue(stmt);
+				return false;
+			}
 		}
 		else
 		{
@@ -2176,6 +2188,11 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 			if (!is_prepared_name_set && stmt->statement_type == ECPGst_prepare)
 			{
 				stmt->name = ecpg_strdup(var->value, lineno);
+				if (!stmt->name)
+				{
+					ecpg_do_epilogue(stmt);
+					return false;
+				}
 				is_prepared_name_set = true;
 			}
 		}

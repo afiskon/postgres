@@ -86,8 +86,21 @@ ecpg_register_prepared_stmt(struct statement *stmt)
 	prep_stmt->lineno = lineno;
 	prep_stmt->connection = con;
 	prep_stmt->command = ecpg_strdup(stmt->command, lineno);
+	if (!prep_stmt->command)
+	{
+		ecpg_free(prep_stmt);
+		ecpg_free(this);
+		return false;
+	}
 	prep_stmt->inlist = prep_stmt->outlist = NULL;
 	this->name = ecpg_strdup(stmt->name, lineno);
+	if (!this->name)
+	{
+		ecpg_free(prep_stmt->command);
+		ecpg_free(prep_stmt);
+		ecpg_free(this);
+		return false;
+	}
 	this->stmt = prep_stmt;
 	this->prepared = true;
 
@@ -178,6 +191,12 @@ prepare_common(int lineno, struct connection *con, const char *name, const char 
 	stmt->lineno = lineno;
 	stmt->connection = con;
 	stmt->command = ecpg_strdup(variable, lineno);
+	if (!stmt->command)
+	{
+		ecpg_free(stmt);
+		ecpg_free(this);
+		return false;
+	}
 	stmt->inlist = stmt->outlist = NULL;
 
 	/* if we have C variables in our statement replace them with '?' */
@@ -185,6 +204,13 @@ prepare_common(int lineno, struct connection *con, const char *name, const char 
 
 	/* add prepared statement to our list */
 	this->name = ecpg_strdup(name, lineno);
+	if (!this->name)
+	{
+		ecpg_free(stmt->command);
+		ecpg_free(stmt);
+		ecpg_free(this);
+		return false;
+	}
 	this->stmt = stmt;
 
 	/* and finally really prepare the statement */
@@ -541,6 +567,8 @@ AddStmtToCache(int lineno,		/* line # of statement */
 	entry = &stmtCacheEntries[entNo];
 	entry->lineno = lineno;
 	entry->ecpgQuery = ecpg_strdup(ecpgQuery, lineno);
+	if (!entry->ecpgQuery)
+		return -1;
 	entry->connection = connection;
 	entry->execs = 0;
 	memcpy(entry->stmtID, stmtID, sizeof(entry->stmtID));
@@ -594,6 +622,9 @@ ecpg_auto_prepare(int lineno, const char *connection_name, const int compat, cha
 
 		*name = ecpg_strdup(stmtID, lineno);
 	}
+
+	if (!*name)
+		return false;
 
 	/* increase usage counter */
 	stmtCacheEntries[entNo].execs++;

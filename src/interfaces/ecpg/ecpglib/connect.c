@@ -58,7 +58,8 @@ ecpg_get_connection_nr(const char *connection_name)
 
 		for (con = all_connections; con != NULL; con = con->next)
 		{
-			if (strcmp(connection_name, con->name) == 0)
+			/* Check for NULL to prevent segfault */
+			if (con->name != NULL && strcmp(connection_name, con->name) == 0)
 				break;
 		}
 		ret = con;
@@ -267,6 +268,7 @@ ECPGconnect(int lineno, int c, const char *name, const char *user, const char *p
 			   *options = NULL;
 	const char **conn_keywords;
 	const char **conn_values;
+	bool		strdup_failed;
 
 	if (sqlca == NULL)
 	{
@@ -460,7 +462,21 @@ ECPGconnect(int lineno, int c, const char *name, const char *user, const char *p
 	 */
 	conn_keywords = (const char **) ecpg_alloc((connect_params + 1) * sizeof(char *), lineno);
 	conn_values = (const char **) ecpg_alloc(connect_params * sizeof(char *), lineno);
-	if (conn_keywords == NULL || conn_values == NULL)
+
+	/* Decide on a connection name */
+	strdup_failed = false;
+	if (connection_name != NULL || realname != NULL)
+	{
+		this->name = ecpg_strdup(connection_name ? connection_name : realname,
+								 lineno);
+		if (this->name == NULL)
+			strdup_failed = true;
+	}
+	else
+		this->name = NULL;
+
+	/* Deal with any failed allocations above */
+	if (conn_keywords == NULL || conn_values == NULL || strdup_failed)
 	{
 		if (host)
 			ecpg_free(host);
@@ -476,6 +492,8 @@ ECPGconnect(int lineno, int c, const char *name, const char *user, const char *p
 			ecpg_free(conn_keywords);
 		if (conn_values)
 			ecpg_free(conn_values);
+		if (this->name)
+			ecpg_free(this->name);
 		free(this);
 		return false;
 	}
@@ -510,16 +528,13 @@ ECPGconnect(int lineno, int c, const char *name, const char *user, const char *p
 				ecpg_free(conn_keywords);
 			if (conn_values)
 				ecpg_free(conn_values);
+			if (this->name)
+				ecpg_free(this->name);
 			free(this);
 			return false;
 		}
 	}
 #endif
-
-	if (connection_name != NULL)
-		this->name = ecpg_strdup(connection_name, lineno);
-	else
-		this->name = ecpg_strdup(realname, lineno);
 
 	this->cache_head = NULL;
 	this->prep_stmts = NULL;
