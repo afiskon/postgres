@@ -508,6 +508,7 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 {
 	char	   *mallocedval = NULL;
 	char	   *newcopy = NULL;
+	bool		alloc_failed = false;
 
 	/*
 	 * arrays are not possible unless the column is an array, too FIXME: we do
@@ -860,11 +861,11 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 					numeric    *nval;
 
 					if (var->arrsize > 1)
-						mallocedval = ecpg_strdup("{", lineno);
+						mallocedval = ecpg_strdup("{", lineno, &alloc_failed);
 					else
-						mallocedval = ecpg_strdup("", lineno);
+						mallocedval = ecpg_strdup("", lineno, &alloc_failed);
 
-					if (!mallocedval)
+					if (alloc_failed)
 						return false;
 
 					for (element = 0; element < asize; element++)
@@ -923,11 +924,11 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 					int			slen;
 
 					if (var->arrsize > 1)
-						mallocedval = ecpg_strdup("{", lineno);
+						mallocedval = ecpg_strdup("{", lineno, &alloc_failed);
 					else
-						mallocedval = ecpg_strdup("", lineno);
+						mallocedval = ecpg_strdup("", lineno, &alloc_failed);
 
-					if (!mallocedval)
+					if (alloc_failed)
 						return false;
 
 					for (element = 0; element < asize; element++)
@@ -970,11 +971,11 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 					int			slen;
 
 					if (var->arrsize > 1)
-						mallocedval = ecpg_strdup("{", lineno);
+						mallocedval = ecpg_strdup("{", lineno, &alloc_failed);
 					else
-						mallocedval = ecpg_strdup("", lineno);
+						mallocedval = ecpg_strdup("", lineno, &alloc_failed);
 
-					if (!mallocedval)
+					if (alloc_failed)
 						return false;
 
 					for (element = 0; element < asize; element++)
@@ -1017,11 +1018,11 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 					int			slen;
 
 					if (var->arrsize > 1)
-						mallocedval = ecpg_strdup("{", lineno);
+						mallocedval = ecpg_strdup("{", lineno, &alloc_failed);
 					else
-						mallocedval = ecpg_strdup("", lineno);
+						mallocedval = ecpg_strdup("", lineno, &alloc_failed);
 
-					if (!mallocedval)
+					if (alloc_failed)
 						return false;
 
 					for (element = 0; element < asize; element++)
@@ -1952,6 +1953,7 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 	struct variable **list;
 	char	   *prepname;
 	bool		is_prepared_name_set;
+	bool		alloc_failed = false;
 
 	*stmt_out = NULL;
 
@@ -2001,7 +2003,7 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 		return false;
 	}
 #endif
-	stmt->oldlocale = ecpg_strdup(setlocale(LC_NUMERIC, NULL), lineno);
+	stmt->oldlocale = ecpg_strdup(setlocale(LC_NUMERIC, NULL), lineno, &alloc_failed);
 	if (stmt->oldlocale == NULL)
 	{
 		ecpg_do_epilogue(stmt);
@@ -2031,8 +2033,8 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 	}
 	else
 	{
-		stmt->command = ecpg_strdup(query, lineno);
-		if (!stmt->command)
+		stmt->command = ecpg_strdup(query, lineno, &alloc_failed);
+		if (alloc_failed)
 		{
 			ecpg_do_epilogue(stmt);
 			return false;
@@ -2049,8 +2051,8 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 		if (command)
 		{
 			stmt->name = stmt->command;
-			stmt->command = ecpg_strdup(command, lineno);
-			if (!stmt->command)
+			stmt->command = ecpg_strdup(command, lineno, &alloc_failed);
+			if (alloc_failed)
 			{
 				ecpg_do_epilogue(stmt);
 				return false;
@@ -2187,7 +2189,7 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 
 			if (!is_prepared_name_set && stmt->statement_type == ECPGst_prepare)
 			{
-				stmt->name = ecpg_strdup(var->value, lineno);
+				stmt->name = ecpg_strdup(var->value, lineno, &alloc_failed);
 				if (!stmt->name)
 				{
 					ecpg_do_epilogue(stmt);

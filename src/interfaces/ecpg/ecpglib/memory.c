@@ -44,7 +44,7 @@ ecpg_realloc(void *ptr, long size, int lineno)
 }
 
 char *
-ecpg_strdup(const char *string, int lineno)
+ecpg_strdup(const char *string, int lineno, bool *alloc_failed)
 {
 	char	   *new;
 
@@ -54,6 +54,7 @@ ecpg_strdup(const char *string, int lineno)
 	new = strdup(string);
 	if (!new)
 	{
+		*alloc_failed = true;
 		ecpg_raise(lineno, ECPG_OUT_OF_MEMORY, ECPG_SQLSTATE_ECPG_OUT_OF_MEMORY, NULL);
 		return NULL;
 	}

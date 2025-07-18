@@ -63,6 +63,7 @@ ecpg_register_prepared_stmt(struct statement *stmt)
 	struct connection *con = stmt->connection;
 	struct prepared_statement *prev = NULL;
 	int			lineno = stmt->lineno;
+	bool alloc_failed = false;
 
 	/* check if we already have prepared this statement */
 	this = ecpg_find_prepared_statement(stmt->name, con, &prev);
@@ -85,18 +86,13 @@ ecpg_register_prepared_stmt(struct statement *stmt)
 	/* create statement */
 	prep_stmt->lineno = lineno;
 	prep_stmt->connection = con;
-	prep_stmt->command = ecpg_strdup(stmt->command, lineno);
-	if (!prep_stmt->command)
-	{
-		ecpg_free(prep_stmt);
-		ecpg_free(this);
-		return false;
-	}
+	prep_stmt->command = ecpg_strdup(stmt->command, lineno, &alloc_failed);
 	prep_stmt->inlist = prep_stmt->outlist = NULL;
-	this->name = ecpg_strdup(stmt->name, lineno);
-	if (!this->name)
+	this->name = ecpg_strdup(stmt->name, lineno, &alloc_failed);
+	if (alloc_failed)
 	{
-		ecpg_free(prep_stmt->command);
+		if (prep_stmt->command)
+			ecpg_free(prep_stmt->command);
 		ecpg_free(prep_stmt);
 		ecpg_free(this);
 		return false;
@@ -174,6 +170,7 @@ prepare_common(int lineno, struct connection *con, const char *name, const char 
 	struct statement *stmt;
 	struct prepared_statement *this;
 	PGresult   *query;
+	bool alloc_failed = false;
 
 	/* allocate new statement */
 	this = (struct prepared_statement *) ecpg_alloc(sizeof(struct prepared_statement), lineno);
@@ -190,23 +187,19 @@ prepare_common(int lineno, struct connection *con, const char *name, const char 
 	/* create statement */
 	stmt->lineno = lineno;
 	stmt->connection = con;
-	stmt->command = ecpg_strdup(variable, lineno);
-	if (!stmt->command)
-	{
-		ecpg_free(stmt);
-		ecpg_free(this);
-		return false;
-	}
+	stmt->command = ecpg_strdup(variable, lineno, &alloc_failed);
 	stmt->inlist = stmt->outlist = NULL;
 
 	/* if we have C variables in our statement replace them with '?' */
-	replace_variables(&(stmt->command), lineno);
+	if (!alloc_failed)
+		replace_variables(&(stmt->command), lineno);
 
 	/* add prepared statement to our list */
-	this->name = ecpg_strdup(name, lineno);
-	if (!this->name)
+	this->name = ecpg_strdup(name, lineno, &alloc_failed);
+	if (alloc_failed)
 	{
-		ecpg_free(stmt->command);
+		if (stmt->command)
+			ecpg_free(stmt->command);
 		ecpg_free(stmt);
 		ecpg_free(this);
 		return false;
@@ -525,6 +518,7 @@ AddStmtToCache(int lineno,		/* line # of statement */
 				luEntNo,
 				entNo;
 	stmtCacheEntry *entry;
+	bool alloc_failed = false;
 
 	/* allocate and zero cache array if we haven't already */
 	if (stmtCacheEntries == NULL)
@@ -566,8 +560,8 @@ AddStmtToCache(int lineno,		/* line # of statement */
 	/* add the query to the entry */
 	entry = &stmtCacheEntries[entNo];
 	entry->lineno = lineno;
-	entry->ecpgQuery = ecpg_strdup(ecpgQuery, lineno);
-	if (!entry->ecpgQuery)
+	entry->ecpgQuery = ecpg_strdup(ecpgQuery, lineno, &alloc_failed);
+	if (alloc_failed)
 		return -1;
 	entry->connection = connection;
 	entry->execs = 0;
@@ -581,6 +575,7 @@ bool
 ecpg_auto_prepare(int lineno, const char *connection_name, const int compat, char **name, const char *query)
 {
 	int			entNo;
+	bool alloc_failed = false;
 
 	/* search the statement cache for this statement */
 	entNo = SearchStmtCache(query);
@@ -602,7 +597,9 @@ ecpg_auto_prepare(int lineno, const char *connection_name, const int compat, cha
 		if (!prep && !prepare_common(lineno, con, stmtID, query))
 			return false;
 
-		*name = ecpg_strdup(stmtID, lineno);
+		*name = ecpg_strdup(stmtID, lineno, &alloc_failed);
+		if (alloc_failed)
+			return false;
 	}
 	else
 	{
@@ -620,7 +617,9 @@ ecpg_auto_prepare(int lineno, const char *connection_name, const int compat, cha
 		if (entNo < 0)
 			return false;
 
-		*name = ecpg_strdup(stmtID, lineno);
+		*name = ecpg_strdup(stmtID, lineno, &alloc_failed);
+		if (alloc_failed)
+			return false;
 	}
 
 	if (!*name)
