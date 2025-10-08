@@ -18,7 +18,6 @@
 
 #include "postgres.h"
 
-#include "storage/aio.h"
 #include "storage/aio_internal.h"
 
 static bool pgaio_sync_needs_synchronous_execution(PgAioHandle *ioh);

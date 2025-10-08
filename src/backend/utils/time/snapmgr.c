@@ -110,7 +110,6 @@
 #include "access/subtrans.h"
 #include "access/transam.h"
 #include "access/xact.h"
-#include "datatype/timestamp.h"
 #include "lib/pairingheap.h"
 #include "miscadmin.h"
 #include "port/pg_lfind.h"

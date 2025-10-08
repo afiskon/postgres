@@ -27,7 +27,6 @@
 #include "postgres.h"
 
 #include "access/table.h"
-#include "catalog/pg_type.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -40,7 +39,6 @@
 #include "optimizer/prep.h"
 #include "optimizer/subselect.h"
 #include "optimizer/tlist.h"
-#include "parser/parse_relation.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteHandler.h"
 #include "rewrite/rewriteManip.h"

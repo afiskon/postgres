@@ -36,7 +36,6 @@
 #include "postmaster/syslogger.h"
 #include "postmaster/walsummarizer.h"
 #include "replication/slot.h"
-#include "replication/walsender.h"
 #include "replication/walsender_private.h"
 #include "storage/bufpage.h"
 #include "storage/checksum.h"

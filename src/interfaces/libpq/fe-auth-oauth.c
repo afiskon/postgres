@@ -19,8 +19,6 @@
 #include <dlfcn.h>
 #endif
 
-#include "common/base64.h"
-#include "common/hmac.h"
 #include "common/jsonapi.h"
 #include "common/oauth-common.h"
 #include "fe-auth.h"

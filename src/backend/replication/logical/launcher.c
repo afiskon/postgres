@@ -42,8 +42,6 @@
 #include "utils/builtins.h"
 #include "utils/memutils.h"
 #include "utils/pg_lsn.h"
-#include "utils/snapmgr.h"
-#include "utils/syscache.h"
 
 /* max sleep time between cycles (3min) */
 #define DEFAULT_NAPTIME_PER_CYCLE 180000L

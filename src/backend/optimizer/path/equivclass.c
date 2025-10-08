@@ -18,7 +18,6 @@
 
 #include <limits.h>
 
-#include "access/stratnum.h"
 #include "catalog/pg_type.h"
 #include "common/hashfn.h"
 #include "nodes/makefuncs.h"

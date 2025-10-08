@@ -19,7 +19,6 @@
 
 #include "access/genam.h"
 #include "access/htup_details.h"
-#include "access/nbtree.h"
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "access/tableam.h"

@@ -7,11 +7,9 @@
  */
 #include "postgres_fe.h"
 
-#include "common.h"
 #include "common/int.h"
 #include "common/logging.h"
 #include "crosstabview.h"
-#include "pqexpbuffer.h"
 #include "psqlscanslash.h"
 #include "settings.h"
 

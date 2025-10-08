@@ -18,7 +18,6 @@
 #include "common/logging.h"
 #include "common/string.h"
 #include "connectdb.h"
-#include "dumputils.h"
 #include "fe_utils/string_utils.h"
 
 static char *constructConnStr(const char **keywords, const char **values);

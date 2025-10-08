@@ -16,13 +16,11 @@
 
 #include "access/commit_ts.h"
 #include "access/genam.h"
-#include "access/gist.h"
 #include "access/relscan.h"
 #include "access/tableam.h"
 #include "access/transam.h"
 #include "access/xact.h"
 #include "access/heapam.h"
-#include "catalog/pg_am_d.h"
 #include "commands/trigger.h"
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"

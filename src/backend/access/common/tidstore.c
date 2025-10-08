@@ -22,7 +22,6 @@
 #include "postgres.h"
 
 #include "access/tidstore.h"
-#include "miscadmin.h"
 #include "nodes/bitmapset.h"
 #include "storage/lwlock.h"
 #include "utils/dsa.h"

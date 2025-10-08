@@ -29,7 +29,6 @@
 #include "storage/bufmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
-#include "utils/memutils.h"
 #include "utils/pgstat_internal.h"
 
 /*

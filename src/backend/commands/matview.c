@@ -22,7 +22,6 @@
 #include "access/xact.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_am.h"
 #include "catalog/pg_opclass.h"
 #include "commands/cluster.h"
 #include "commands/matview.h"

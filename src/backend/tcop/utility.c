@@ -21,7 +21,6 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/toasting.h"
 #include "commands/alter.h"
