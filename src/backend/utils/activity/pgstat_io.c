@@ -17,7 +17,6 @@
 #include "postgres.h"
 
 #include "executor/instrument.h"
-#include "storage/bufmgr.h"
 #include "utils/pgstat_internal.h"
 
 static PgStat_PendingIO PendingIOStats;

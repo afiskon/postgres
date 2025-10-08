@@ -19,12 +19,9 @@
 
 #include "access/heapam.h"
 #include "catalog/indexing.h"
-#include "catalog/namespace.h"
 #include "statistics/stat_utils.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
 #include "utils/fmgrprotos.h"
-#include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
 

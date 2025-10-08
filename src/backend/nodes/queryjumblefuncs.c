@@ -38,12 +38,9 @@
 #include "postgres.h"
 
 #include "access/transam.h"
-#include "catalog/pg_proc.h"
 #include "common/hashfn.h"
 #include "miscadmin.h"
-#include "nodes/nodeFuncs.h"
 #include "nodes/queryjumble.h"
-#include "utils/lsyscache.h"
 #include "parser/scansup.h"
 
 #define JUMBLE_SIZE				1024	/* query serialization buffer size */

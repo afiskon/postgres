@@ -20,7 +20,6 @@
 
 #include "executor/executor.h"
 #include "executor/execScan.h"
-#include "miscadmin.h"
 
 /* ----------------------------------------------------------------
  *		ExecScan

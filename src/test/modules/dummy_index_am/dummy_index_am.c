@@ -15,7 +15,6 @@
 
 #include "access/amapi.h"
 #include "access/reloptions.h"
-#include "catalog/index.h"
 #include "commands/vacuum.h"
 #include "nodes/pathnodes.h"
 

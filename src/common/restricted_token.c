@@ -20,7 +20,6 @@
 
 #include "postgres_fe.h"
 
-#include "common/logging.h"
 #include "common/restricted_token.h"
 
 #ifdef WIN32

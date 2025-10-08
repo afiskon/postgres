@@ -32,7 +32,6 @@
 #include "access/nbtree.h"
 #include "access/relscan.h"
 #include "access/tableam.h"
-#include "catalog/pg_am.h"
 #include "executor/executor.h"
 #include "executor/nodeIndexscan.h"
 #include "lib/pairingheap.h"

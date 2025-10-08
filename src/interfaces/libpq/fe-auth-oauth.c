@@ -19,14 +19,11 @@
 #include <dlfcn.h>
 #endif
 
-#include "common/base64.h"
-#include "common/hmac.h"
 #include "common/jsonapi.h"
 #include "common/oauth-common.h"
 #include "fe-auth.h"
 #include "fe-auth-oauth.h"
 #include "mb/pg_wchar.h"
-#include "pg_config_paths.h"
 
 /* The exported OAuth callback mechanism. */
 static void *oauth_init(PGconn *conn, const char *password,

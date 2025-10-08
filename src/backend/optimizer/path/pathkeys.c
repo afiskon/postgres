@@ -17,7 +17,6 @@
  */
 #include "postgres.h"
 
-#include "access/stratnum.h"
 #include "catalog/pg_opfamily.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/cost.h"

@@ -27,7 +27,6 @@
 #include "parser/parse_collate.h"
 #include "parser/parse_func.h"
 #include "rewrite/rewriteHandler.h"
-#include "storage/proc.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"

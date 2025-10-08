@@ -24,7 +24,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_namespace.h"
 #include "commands/collationcmds.h"
-#include "commands/comment.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "common/string.h"
