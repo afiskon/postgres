@@ -878,7 +878,7 @@ static void
 refresh_by_match_merge_step6(const char *diffname, const char *tempname)
 {
 	StringInfoData querybuf;
-
+	
 	initStringInfo(&querybuf);
 
 	/* Clean up temp tables. */
@@ -958,12 +958,12 @@ refresh_by_match_merge_step6(const char *diffname, const char *tempname)
 	/* Step 5: Apply DELETE and INSERT operations */
 	refresh_by_match_merge_step5(matviewname, diffname);
 
-	/* Step 6: Clean up temp tables */
-	refresh_by_match_merge_step6(diffname, tempname);
-
-	/* Close relations and SPI context */
+	/* Close relations before cleaning up temp tables (matches original order) */
 	table_close(tempRel, NoLock);
 	table_close(matviewRel, NoLock);
+
+	/* Step 6: Clean up temp tables (in same SPI context) */
+	refresh_by_match_merge_step6(diffname, tempname);
 
 	/* Close SPI context. */
 	if (SPI_finish() != SPI_OK_FINISH)
