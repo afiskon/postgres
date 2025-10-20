@@ -29,7 +29,6 @@
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "executor/executor.h"
-#include "executor/spi.h"
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "rewrite/rewriteHandler.h"
@@ -40,7 +39,13 @@
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
-
+// vvv AALEKSEEV vvv
+#include "utils/tuplestore.h"
+#include "utils/hsearch.h"
+#include "utils/memutils.h"
+#include "common/hashfn.h"
+#include "catalog/pg_type.h"
+// ^^^ AALEKSEEV ^^^
 
 typedef struct
 {
@@ -61,7 +66,7 @@ static void transientrel_shutdown(DestReceiver *self);
 static void transientrel_destroy(DestReceiver *self);
 static uint64 refresh_matview_datafill(DestReceiver *dest, Query *query,
 									   const char *queryString, bool is_create);
-static char *make_temptable_name_n(char *tempname, int n);
+
 static void refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 								   int save_sec_context);
 static void refresh_by_heap_swap(Oid matviewOid, Oid OIDNewHeap, char relpersistence);
@@ -557,26 +562,8 @@ transientrel_destroy(DestReceiver *self)
 }
 
 
-/*
- * Given a qualified temporary table name, append an underscore followed by
- * the given integer, to make a new table name based on the old one.
- * The result is a palloc'd string.
- *
- * As coded, this would fail to make a valid SQL name if the given name were,
- * say, "FOO"."BAR".  Currently, the table name portion of the input will
- * never be double-quoted because it's of the form "pg_temp_NNN", cf
- * make_new_heap().  But we might have to work harder someday.
- */
-static char *
-make_temptable_name_n(char *tempname, int n)
-{
-	StringInfoData namebuf;
 
-	initStringInfo(&namebuf);
-	appendStringInfoString(&namebuf, tempname);
-	appendStringInfo(&namebuf, "_%d", n);
-	return namebuf.data;
-}
+
 
 // ==== AALEKSEEV ====
 
@@ -631,7 +618,7 @@ make_temptable_name_n(char *tempname, int n)
  static void free_unique_key_info(UniqueKeyInfo *keyinfo);
  static uint32 hash_tuple_key(TupleTableSlot *slot, UniqueKeyInfo *keyinfo);
  static bool tuples_equal_by_key(TupleTableSlot *slot1, TupleTableSlot *slot2, UniqueKeyInfo *keyinfo);
- static int compare_tuples_by_key(TupleTableSlot *slot1, TupleTableSlot *slot2, UniqueKeyInfo *keyinfo);
+
  static void store_diff_tuple(Tuplestorestate *diff_store, DiffOperationType op,
 							  ItemPointer old_tid, HeapTuple new_tuple);
  static HeapTuple get_diff_tuple(Tuplestorestate *diff_store, TupleTableSlot *slot,
@@ -806,12 +793,8 @@ make_temptable_name_n(char *tempname, int n)
 
 		indexRel = index_open(indexoid, RowExclusiveLock);
 
-		/* Check if this is a usable unique index (from original code) */
-		if (indexRel->rd_index->indisunique &&
-			indexRel->rd_index->indisready &&
-			indexRel->rd_index->indisvalid &&
-			IndexIsLive(indexRel->rd_index) &&
-			!indexRel->rd_index->indisprimary)
+		/* Check if this is a usable unique index */
+		if (is_usable_unique_index(indexRel))
 		{
 			Form_pg_index indexStruct = indexRel->rd_index;
 			int indnkeyatts = indexStruct->indnkeyatts;
@@ -972,7 +955,7 @@ make_temptable_name_n(char *tempname, int n)
 		{
 			/* Fall back to basic hash_any */
 			bool typbyval;
-			int typlen;
+			int16 typlen;
 
 			get_typlenbyval(keyinfo->key_types[i], &typlen, &typbyval);
 
@@ -1032,46 +1015,7 @@ make_temptable_name_n(char *tempname, int n)
 	return true;
  }
 
- /*
-  * compare_tuples_by_key
-  *
-  * Compare two tuples for sorting purposes.
-  * Returns: < 0 if slot1 < slot2, 0 if equal, > 0 if slot1 > slot2
-  */
- static int
- compare_tuples_by_key(TupleTableSlot *slot1, TupleTableSlot *slot2, UniqueKeyInfo *keyinfo)
- {
-	int i;
 
-	for (i = 0; i < keyinfo->nkeys; i++)
-	{
-		Datum value1, value2;
-		bool isnull1, isnull2;
-		int32 cmp_result;
-
-		value1 = slot_getattr(slot1, keyinfo->key_attrs[i], &isnull1);
-		value2 = slot_getattr(slot2, keyinfo->key_attrs[i], &isnull2);
-
-		/* Handle NULL values (NULL sorts first) */
-		if (isnull1 && isnull2)
-			continue;
-		if (isnull1)
-			return -1;
-		if (isnull2)
-			return 1;
-
-		/* Use the type's comparison function */
-		cmp_result = DatumGetInt32(FunctionCall2Coll(
-			&keyinfo->eq_functions[i], /* We'd need btree ops for proper comparison */
-			DEFAULT_COLLATION_OID,
-			value1, value2));
-
-		if (cmp_result != 0)
-			return cmp_result;
-	}
-
-	return 0;
- }
 
  /*
   * check_for_duplicates_nospi
@@ -1164,8 +1108,7 @@ make_temptable_name_n(char *tempname, int n)
  {
 	TableScanDesc old_scan, new_scan;
 	TupleTableSlot *old_slot, *new_slot;
-	bool old_valid, new_valid;
-	int cmp_result;
+
 
 	/*
 	 * For simplicity, we'll use a nested loop approach.
@@ -1319,7 +1262,7 @@ make_temptable_name_n(char *tempname, int n)
 	/* Process all difference tuples */
 	while (tuplestore_gettupleslot(diff_store, true, false, slot))
 	{
-		HeapTuple diff_tuple = get_diff_tuple(diff_store, slot, &diff_data);
+		get_diff_tuple(diff_store, slot, &diff_data);
 
 		switch (diff_data.operation)
 		{
