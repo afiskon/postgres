@@ -578,68 +578,28 @@ make_temptable_name_n(char *tempname, int n)
 	return namebuf.data;
 }
 
+// vvv AALEKSEEV vvv
+
+static void refresh_by_match_merge_step1(Relation tempRel, const char *tempname);
+static void refresh_by_match_merge_step2(Oid relowner, int save_sec_context,
+										 const char *tempname, const char *diffname);
+static void refresh_by_match_merge_step3(StringInfo querybuf, Relation matviewRel,
+										 bool *foundUniqueIndex);
+static void refresh_by_match_merge_step4(const char *querybuf_data, const char *diffname,
+										 const char *tempname, const char *matviewname);
+static void refresh_by_match_merge_step5(const char *matviewname, const char *diffname);
+static void refresh_by_match_merge_step6(const char *diffname, const char *tempname);
+
+
 /*
- * refresh_by_match_merge
- *
- * Refresh a materialized view with transactional semantics, while allowing
- * concurrent reads.
- *
- * This is called after a new version of the data has been created in a
- * temporary table.  It performs a full outer join against the old version of
- * the data, producing "diff" results.  This join cannot work if there are any
- * duplicated rows in either the old or new versions, in the sense that every
- * column would compare as equal between the two rows.  It does work correctly
- * in the face of rows which have at least one NULL value, with all non-NULL
- * columns equal.  The behavior of NULLs on equality tests and on UNIQUE
- * indexes turns out to be quite convenient here; the tests we need to make
- * are consistent with default behavior.  If there is at least one UNIQUE
- * index on the materialized view, we have exactly the guarantee we need.
- *
- * The temporary table used to hold the diff results contains just the TID of
- * the old record (if matched) and the ROW from the new table as a single
- * column of complex record type (if matched).
- *
- * Once we have the diff table, we perform set-based DELETE and INSERT
- * operations against the materialized view, and discard both temporary
- * tables.
- *
- * Everything from the generation of the new data to applying the differences
- * takes place under cover of an ExclusiveLock, since it seems as though we
- * would want to prohibit not only concurrent REFRESH operations, but also
- * incremental maintenance.  It also doesn't seem reasonable or safe to allow
- * SELECT FOR UPDATE or SELECT FOR SHARE on rows being updated or deleted by
- * this command.
+ * refresh_by_match_merge_step1: Check for duplicate rows in new data
  */
 static void
-refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
-					   int save_sec_context)
+refresh_by_match_merge_step1(Relation tempRel, const char *tempname)
 {
 	StringInfoData querybuf;
-	Relation	matviewRel;
-	Relation	tempRel;
-	char	   *matviewname;
-	char	   *tempname;
-	char	   *diffname;
-	TupleDesc	tupdesc;
-	bool		foundUniqueIndex;
-	List	   *indexoidlist;
-	ListCell   *indexoidscan;
-	int16		relnatts;
-	Oid		   *opUsedForQual;
 
 	initStringInfo(&querybuf);
-	matviewRel = table_open(matviewOid, NoLock);
-	matviewname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(matviewRel)),
-											 RelationGetRelationName(matviewRel));
-	tempRel = table_open(tempOid, NoLock);
-	tempname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(tempRel)),
-										  RelationGetRelationName(tempRel));
-	diffname = make_temptable_name_n(tempname, 2);
-
-	relnatts = RelationGetNumberOfAttributes(matviewRel);
-
-	/* Open SPI context. */
-	SPI_connect();
 
 	/*
 	 * We need to ensure that there are not duplicate rows without NULLs in
@@ -652,7 +612,6 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 * keep ".*" from being expanded into multiple columns in a SELECT list.
 	 * Compare ruleutils.c's get_variable().
 	 */
-	resetStringInfo(&querybuf);
 	appendStringInfo(&querybuf,
 					 "SELECT newdata.*::%s FROM %s newdata "
 					 "WHERE newdata.* IS NOT NULL AND EXISTS "
@@ -675,10 +634,22 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 		ereport(ERROR,
 				(errcode(ERRCODE_CARDINALITY_VIOLATION),
 				 errmsg("new data for materialized view \"%s\" contains duplicate rows without any null columns",
-						RelationGetRelationName(matviewRel)),
+						RelationGetRelationName(tempRel)),
 				 errdetail("Row: %s",
 						   SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1))));
 	}
+}
+
+/*
+ * refresh_by_match_merge_step2: Create the temporary diff table
+ */
+static void
+refresh_by_match_merge_step2(Oid relowner, int save_sec_context,
+							 const char *tempname, const char *diffname)
+{
+	StringInfoData querybuf;
+
+	initStringInfo(&querybuf);
 
 	/*
 	 * Create the temporary "diff" table.
@@ -690,7 +661,6 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 */
 	SetUserIdAndSecContext(relowner,
 						   save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
-	resetStringInfo(&querybuf);
 	appendStringInfo(&querybuf,
 					 "CREATE TEMP TABLE %s (tid pg_catalog.tid)",
 					 diffname);
@@ -704,24 +674,25 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 					 diffname, tempname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
+}
 
-	/* Start building the query for populating the diff table. */
-	resetStringInfo(&querybuf);
-	appendStringInfo(&querybuf,
-					 "INSERT INTO %s "
-					 "SELECT mv.ctid AS tid, newdata.*::%s AS newdata "
-					 "FROM %s mv FULL JOIN %s newdata ON (",
-					 diffname, tempname, matviewname, tempname);
+/*
+ * refresh_by_match_merge_step3: Build JOIN conditions for unique indexes
+ */
+static void
+refresh_by_match_merge_step3(StringInfo querybuf, Relation matviewRel,
+							 bool *foundUniqueIndex)
+{
+	TupleDesc	tupdesc;
+	List	   *indexoidlist;
+	ListCell   *indexoidscan;
+	int16		relnatts;
+	Oid		   *opUsedForQual;
 
-	/*
-	 * Get the list of index OIDs for the table from the relcache, and look up
-	 * each one in the pg_index syscache.  We will test for equality on all
-	 * columns present in all unique indexes which only reference columns and
-	 * include all rows.
-	 */
 	tupdesc = matviewRel->rd_att;
+	relnatts = RelationGetNumberOfAttributes(matviewRel);
 	opUsedForQual = (Oid *) palloc0(sizeof(Oid) * relnatts);
-	foundUniqueIndex = false;
+	*foundUniqueIndex = false;
 
 	indexoidlist = RelationGetIndexList(matviewRel);
 
@@ -795,20 +766,20 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 				/*
 				 * Actually add the qual, ANDed with any others.
 				 */
-				if (foundUniqueIndex)
-					appendStringInfoString(&querybuf, " AND ");
+				if (*foundUniqueIndex)
+					appendStringInfoString(querybuf, " AND ");
 
 				leftop = quote_qualified_identifier("newdata",
 													NameStr(attr->attname));
 				rightop = quote_qualified_identifier("mv",
 													 NameStr(attr->attname));
 
-				generate_operator_clause(&querybuf,
+				generate_operator_clause(querybuf,
 										 leftop, attrtype,
 										 op,
 										 rightop, attrtype);
 
-				foundUniqueIndex = true;
+				*foundUniqueIndex = true;
 			}
 		}
 
@@ -827,16 +798,33 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 * function called as part of refreshing the matview drops the index.
 	 * That's a pretty silly thing to do.)
 	 */
-	if (!foundUniqueIndex)
+	if (!*foundUniqueIndex)
 		ereport(ERROR,
 				errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				errmsg("could not find suitable unique index on materialized view \"%s\"",
 					   RelationGetRelationName(matviewRel)));
+}
 
-	appendStringInfoString(&querybuf,
-						   " AND newdata.* OPERATOR(pg_catalog.*=) mv.*) "
-						   "WHERE newdata.* IS NULL OR mv.* IS NULL "
-						   "ORDER BY tid");
+/*
+ * refresh_by_match_merge_step4: Populate the diff table with FULL OUTER JOIN
+ */
+static void
+refresh_by_match_merge_step4(const char *querybuf_data, const char *diffname,
+							 const char *tempname, const char *matviewname)
+{
+	StringInfoData querybuf;
+
+	initStringInfo(&querybuf);
+
+	/* Start building the query for populating the diff table. */
+	appendStringInfo(&querybuf,
+					 "INSERT INTO %s "
+					 "SELECT mv.ctid AS tid, newdata.*::%s AS newdata "
+					 "FROM %s mv FULL JOIN %s newdata ON (%s"
+					 " AND newdata.* OPERATOR(pg_catalog.*=) mv.*) "
+					 "WHERE newdata.* IS NULL OR mv.* IS NULL "
+					 "ORDER BY tid",
+					 diffname, tempname, matviewname, tempname, querybuf_data);
 
 	/* Populate the temporary "diff" table. */
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_INSERT)
@@ -846,11 +834,21 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 * We have no further use for data from the "full-data" temp table, but we
 	 * must keep it around because its type is referenced from the diff table.
 	 */
+}
+
+/*
+ * refresh_by_match_merge_step5: Apply DELETE and INSERT operations
+ */
+static void
+refresh_by_match_merge_step5(const char *matviewname, const char *diffname)
+{
+	StringInfoData querybuf;
+
+	initStringInfo(&querybuf);
 
 	OpenMatViewIncrementalMaintenance();
 
 	/* Deletes must come before inserts; do them first. */
-	resetStringInfo(&querybuf);
 	appendStringInfo(&querybuf,
 					 "DELETE FROM %s mv WHERE ctid OPERATOR(pg_catalog.=) ANY "
 					 "(SELECT diff.tid FROM %s diff "
@@ -871,19 +869,106 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 
 	/* We're done maintaining the materialized view. */
 	CloseMatViewIncrementalMaintenance();
-	table_close(tempRel, NoLock);
-	table_close(matviewRel, NoLock);
+}
+
+/*
+ * refresh_by_match_merge_step6: Clean up temp tables
+ */
+static void
+refresh_by_match_merge_step6(const char *diffname, const char *tempname)
+{
+	StringInfoData querybuf;
+
+	initStringInfo(&querybuf);
 
 	/* Clean up temp tables. */
-	resetStringInfo(&querybuf);
 	appendStringInfo(&querybuf, "DROP TABLE %s, %s", diffname, tempname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
+}
+
+/*
+ * refresh_by_match_merge
+ *
+ * Refresh a materialized view with transactional semantics, while allowing
+ * concurrent reads.
+ *
+ * This is called after a new version of the data has been created in a
+ * temporary table.  It performs a full outer join against the old version of
+ * the data, producing "diff" results.  This join cannot work if there are any
+ * duplicated rows in either the old or new versions, in the sense that every
+ * column would compare as equal between the two rows.  It does work correctly
+ * in the face of rows which have at least one NULL value, with all non-NULL
+ * columns equal.  The behavior of NULLs on equality tests and on UNIQUE
+ * indexes turns out to be quite convenient here; the tests we need to make
+ * are consistent with default behavior.  If there is at least one UNIQUE
+ * index on the materialized view, we have exactly the guarantee we need.
+ *
+ * The temporary table used to hold the diff results contains just the TID of
+ * the old record (if matched) and the ROW from the new table as a single
+ * column of complex record type (if matched).
+ *
+ * Once we have the diff table, we perform set-based DELETE and INSERT
+ * operations against the materialized view, and discard both temporary
+ * tables.
+ *
+ * Everything from the generation of the new data to applying the differences
+ * takes place under cover of an ExclusiveLock, since it seems as though we
+ * would want to prohibit not only concurrent REFRESH operations, but also
+ * incremental maintenance.  It also doesn't seem reasonable or safe to allow
+ * SELECT FOR UPDATE or SELECT FOR SHARE on rows being updated or deleted by
+ * this command.
+ */
+ static void
+ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
+					   int save_sec_context)
+ {
+	StringInfoData querybuf;
+	Relation	matviewRel;
+	Relation	tempRel;
+	char	   *matviewname;
+	char	   *tempname;
+	char	   *diffname;
+	bool		foundUniqueIndex;
+
+	initStringInfo(&querybuf);
+	matviewRel = table_open(matviewOid, NoLock);
+	matviewname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(matviewRel)),
+											 RelationGetRelationName(matviewRel));
+	tempRel = table_open(tempOid, NoLock);
+	tempname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(tempRel)),
+										  RelationGetRelationName(tempRel));
+	diffname = make_temptable_name_n(tempname, 2);
+
+	/* Open SPI context. */
+	SPI_connect();
+
+	/* Step 1: Check for duplicate rows in new data */
+	refresh_by_match_merge_step1(tempRel, tempname);
+
+	/* Step 2: Create the temporary diff table */
+	refresh_by_match_merge_step2(relowner, save_sec_context, tempname, diffname);
+
+	/* Step 3: Build JOIN conditions for unique indexes */
+	refresh_by_match_merge_step3(&querybuf, matviewRel, &foundUniqueIndex);
+
+	/* Step 4: Populate the diff table with FULL OUTER JOIN */
+	refresh_by_match_merge_step4(querybuf.data, diffname, tempname, matviewname);
+
+	/* Step 5: Apply DELETE and INSERT operations */
+	refresh_by_match_merge_step5(matviewname, diffname);
+
+	/* Step 6: Clean up temp tables */
+	refresh_by_match_merge_step6(diffname, tempname);
+
+	/* Close relations and SPI context */
+	table_close(tempRel, NoLock);
+	table_close(matviewRel, NoLock);
 
 	/* Close SPI context. */
 	if (SPI_finish() != SPI_OK_FINISH)
 		elog(ERROR, "SPI_finish failed");
-}
+ }
 
 /*
  * Swap the physical files of the target and transient tables, then rebuild
