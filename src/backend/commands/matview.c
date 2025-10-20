@@ -641,11 +641,6 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	/* Open SPI context. */
 	SPI_connect();
 
-	/* Analyze the temp table with the new contents. */
-	appendStringInfo(&querybuf, "ANALYZE %s", tempname);
-	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
-		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
-
 	/*
 	 * We need to ensure that there are not duplicate rows without NULLs in
 	 * the new data set before we can count on the "diff" results.  Check for
@@ -851,12 +846,6 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 * We have no further use for data from the "full-data" temp table, but we
 	 * must keep it around because its type is referenced from the diff table.
 	 */
-
-	/* Analyze the diff table. */
-	resetStringInfo(&querybuf);
-	appendStringInfo(&querybuf, "ANALYZE %s", diffname);
-	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
-		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
 
 	OpenMatViewIncrementalMaintenance();
 
