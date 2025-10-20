@@ -580,7 +580,7 @@ make_temptable_name_n(char *tempname, int n)
 
 // vvv AALEKSEEV vvv
 
-static void refresh_by_match_merge_step1(Relation tempRel, const char *tempname);
+static void refresh_by_match_merge_step1(Relation tempRel, const char *tempname, Relation matviewRel);
 static void refresh_by_match_merge_step2(Oid relowner, int save_sec_context,
 										 const char *tempname, const char *diffname);
 static void refresh_by_match_merge_step3(StringInfo querybuf, Relation matviewRel,
@@ -595,7 +595,7 @@ static void refresh_by_match_merge_step6(const char *diffname, const char *tempn
  * refresh_by_match_merge_step1: Check for duplicate rows in new data
  */
 static void
-refresh_by_match_merge_step1(Relation tempRel, const char *tempname)
+refresh_by_match_merge_step1(Relation tempRel, const char *tempname, Relation matviewRel)
 {
 	StringInfoData querybuf;
 
@@ -634,7 +634,7 @@ refresh_by_match_merge_step1(Relation tempRel, const char *tempname)
 		ereport(ERROR,
 				(errcode(ERRCODE_CARDINALITY_VIOLATION),
 				 errmsg("new data for materialized view \"%s\" contains duplicate rows without any null columns",
-						RelationGetRelationName(tempRel)),
+						RelationGetRelationName(matviewRel)),
 				 errdetail("Row: %s",
 						   SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1))));
 	}
@@ -944,7 +944,7 @@ refresh_by_match_merge_step6(const char *diffname, const char *tempname)
 	SPI_connect();
 
 	/* Step 1: Check for duplicate rows in new data */
-	refresh_by_match_merge_step1(tempRel, tempname);
+	refresh_by_match_merge_step1(tempRel, tempname, matviewRel);
 
 	/* Step 2: Create the temporary diff table */
 	refresh_by_match_merge_step2(relowner, save_sec_context, tempname, diffname);
