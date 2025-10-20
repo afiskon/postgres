@@ -1,0 +1,18 @@
+# Перед модификацией
+time psql -d testdb -f matview_test_simple.sql > results_before.txt 2>&1
+
+# После модификации  
+time psql -d testdb -f matview_test_simple.sql > results_after.txt 2>&1
+
+# Сравнить результаты
+echo "=== TIMING COMPARISON ==="
+echo "Before:"
+grep "Time:" results_before.txt
+echo "After:" 
+grep "Time:" results_after.txt
+
+echo "=== CORRECTNESS CHECK ==="
+grep -E "(counts_match|sums_match)" results_after.txt
+
+echo "=== RESOURCE CHECK ==="  
+grep "temp_objects_count" results_after.txt
