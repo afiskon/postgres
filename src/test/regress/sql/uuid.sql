@@ -152,5 +152,14 @@ SELECT '\x019a2f859ced7225b99d9c55044a2563'::bytea::uuid;
 SELECT '\x1234567890abcdef'::bytea::uuid; -- error
 SELECT v = v::bytea::uuid as matched FROM gen_random_uuid() v;
 
+-- make sure base32hex encoding works with UUIDs and preserves ordering
+SELECT orig, encode(orig :: bytea, 'base32hex') AS enc
+FROM unnest(ARRAY[
+    '123e4567-e89b-12d3-a456-426614174000',
+    '00000000-0000-0000-0000-000000000000',
+    '11111111-1111-1111-1111-111111111111',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff'] :: uuid[]
+) AS orig ORDER BY enc;
+
 -- clean up
 DROP TABLE guid1, guid2, guid3 CASCADE;

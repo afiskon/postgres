@@ -835,9 +835,36 @@ SELECT encode('\x01'::bytea, 'invalid');  -- error
 SELECT decode('00', 'invalid');           -- error
 
 --
--- base64url encoding/decoding
+-- base32hex encoding/decoding
 --
 SET bytea_output TO hex;
+
+SELECT encode('', 'base32hex');  -- ''
+SELECT encode('\x11', 'base32hex');  -- '24======'
+SELECT encode('\x1122', 'base32hex');  -- '24H0===='
+SELECT encode('\x112233', 'base32hex');  -- '24H36==='
+SELECT encode('\x11223344', 'base32hex');  -- '24H36H0='
+SELECT encode('\x1122334455', 'base32hex');  -- '24H36H2L'
+SELECT encode('\x112233445566', 'base32hex');  -- '24H36H2LCO======'
+
+SELECT decode('', 'base32hex');  -- ''
+SELECT decode('24======', 'base32hex');  -- \x11
+SELECT decode('24H0====', 'base32hex');  -- \x1122
+SELECT decode('24H36===', 'base32hex');  -- \x112233
+SELECT decode('24H36H0=', 'base32hex');  -- \x11223344
+SELECT decode('24H36H2L', 'base32hex');  -- \x1122334455
+SELECT decode('24H36H2LCO======', 'base32hex');  -- \x112233445566
+
+SELECT decode('24', 'base32hex');  -- OK, padding `=` are optional
+SELECT decode('24h36h2lco', 'base32hex');  -- OK, the encoding is case-insensitive
+SELECT decode('=', 'base32hex');  -- error
+SELECT decode('W', 'base32hex');  -- error
+SELECT decode('24H36H0=24', 'base32hex'); -- error
+
+
+--
+-- base64url encoding/decoding
+--
 
 -- Simple encoding/decoding
 SELECT encode('\x69b73eff', 'base64url');  -- abc-_w

@@ -826,6 +826,158 @@ esc_dec_len(const char *src, size_t srclen)
 }
 
 /*
+ * BASE32HEX
+ */
+
+static const char base32hex_table[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+
+static uint64
+base32hex_enc_len(const char *src, size_t srclen)
+{
+	/* 5 bytes encode to 8 characters, round up to multiple of 8 for padding */
+	return ((uint64) srclen + 4) / 5 * 8;
+}
+
+static uint64
+base32hex_dec_len(const char *src, size_t srclen)
+{
+	/* Decode length is (srclen * 5) / 8, but we may have padding */
+	return ((uint64) srclen * 5) / 8;
+}
+
+static uint64
+base32hex_encode(const char *src, size_t srclen, char *dst)
+{
+	const unsigned char *data = (const unsigned char *) src;
+	uint64		bits_buffer = 0;
+	int			bits_in_buffer = 0;
+	uint64		output_pos = 0;
+	size_t		i;
+
+	for (i = 0; i < srclen; i++)
+	{
+		/* Add 8 bits to the buffer */
+		bits_buffer = (bits_buffer << 8) | data[i];
+		bits_in_buffer += 8;
+
+		/* Extract 5-bit chunks while we have enough bits */
+		while (bits_in_buffer >= 5)
+		{
+			bits_in_buffer -= 5;
+			/* Extract top 5 bits */
+			dst[output_pos++] = base32hex_table[(bits_buffer >> bits_in_buffer) & 0x1F];
+			/* Clear the extracted bits by masking */
+			bits_buffer &= ((1ULL << bits_in_buffer) - 1);
+		}
+	}
+
+	/* Handle remaining bits (if any) */
+	if (bits_in_buffer > 0)
+	{
+		dst[output_pos++] = base32hex_table[(bits_buffer << (5 - bits_in_buffer)) & 0x1F];
+	}
+
+	/* Add padding to make length a multiple of 8 (per RFC 4648) */
+	while (output_pos % 8 != 0)
+	{
+		dst[output_pos++] = '=';
+	}
+
+	return output_pos;
+}
+
+static uint64
+base32hex_decode(const char *src, size_t srclen, char *dst)
+{
+	const unsigned char *data = (const unsigned char *) src;
+	uint64		bits_buffer = 0;
+	int			bits_in_buffer = 0;
+	uint64		output_pos = 0;
+	size_t		i;
+	int			pos = 0;		/* position within 8-character group (0-7) */
+	bool		end = false;	/* have we seen padding? */
+
+	for (i = 0; i < srclen; i++)
+	{
+		unsigned char c = data[i];
+		int			val;
+
+		/* Skip whitespace */
+		if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+			continue;
+
+		if (c == '=')
+		{
+			/*
+			 * Padding is only valid at positions 2, 4, 5, or 7 within an
+			 * 8-character group (corresponding to 1, 2, 3, or 4 input bytes).
+			 * We only check the position for the first '=' character.
+			 */
+			if (!end)
+			{
+				if (pos != 2 && pos != 4 && pos != 5 && pos != 7)
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("unexpected \"=\" while decoding %s sequence",
+									"base32hex")));
+				end = true;
+			}
+			pos++;
+			continue;
+		}
+
+		/* No data characters allowed after padding */
+		if (end)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid symbol \"%.*s\" found while decoding %s sequence",
+							pg_mblen((const char *) &c), (const char *) &c,
+							"base32hex")));
+
+		/* Decode base32hex character (0-9, A-V, case-insensitive) */
+		if (c >= '0' && c <= '9')
+			val = c - '0';
+		else if (c >= 'A' && c <= 'V')
+			val = c - 'A' + 10;
+		else if (c >= 'a' && c <= 'v')
+			val = c - 'a' + 10;
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid symbol \"%.*s\" found while decoding %s sequence",
+							pg_mblen((const char *) &c), (const char *) &c,
+							"base32hex")));
+
+		/* Add 5 bits to buffer */
+		bits_buffer = (bits_buffer << 5) | val;
+		bits_in_buffer += 5;
+		pos++;
+
+		/* Extract 8-bit bytes when we have enough bits */
+		while (bits_in_buffer >= 8)
+		{
+			bits_in_buffer -= 8;
+			dst[output_pos++] = (unsigned char) (bits_buffer >> bits_in_buffer);
+			/* Clear the extracted bits */
+			bits_buffer &= ((1ULL << bits_in_buffer) - 1);
+		}
+
+		/* Reset position after each complete 8-character group */
+		if (pos == 8)
+			pos = 0;
+	}
+
+	/* Verify no extra bits remain (padding bits should be zero) */
+	if (bits_in_buffer > 0 && (bits_buffer & ((1ULL << bits_in_buffer) - 1)) != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("invalid base32hex end sequence"),
+				 errhint("Input data has non-zero padding bits.")));
+
+	return output_pos;
+}
+
+/*
  * Common
  */
 
@@ -852,6 +1004,12 @@ static const struct
 		"base64url",
 		{
 			pg_base64url_enc_len, pg_base64url_dec_len, pg_base64url_encode, pg_base64url_decode
+		}
+	},
+	{
+		"base32hex",
+		{
+			base32hex_enc_len, base32hex_dec_len, base32hex_encode, base32hex_decode
 		}
 	},
 	{

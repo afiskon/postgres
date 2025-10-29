@@ -729,6 +729,7 @@
        <parameter>format</parameter> values are:
        <link linkend="encode-format-base64"><literal>base64</literal></link>,
        <link linkend="encode-format-base64url"><literal>base64url</literal></link>,
+       <link linkend="encode-format-base32hex"><literal>base32hex</literal></link>,
        <link linkend="encode-format-escape"><literal>escape</literal></link>,
        <link linkend="encode-format-hex"><literal>hex</literal></link>.
       </para>
@@ -800,6 +801,30 @@
        uses <literal>'-'</literal> instead of <literal>'+'</literal> and
        <literal>'_'</literal> instead of <literal>'/'</literal> and also omits
        the <literal>'='</literal> padding character.
+      </para>
+     </listitem>
+    </varlistentry>
+
+    <varlistentry id="encode-format-base32hex">
+     <term>base32hex
+      <indexterm>
+       <primary>base32hex format</primary>
+      </indexterm></term>
+     <listitem>
+      <para>
+       The <literal>base32hex</literal> format is that of
+       <ulink url="https://datatracker.ietf.org/doc/html/rfc4648#section-7">
+       RFC 4648 Section 7</ulink>.  It uses the extended hex alphabet
+       (0-9, A-V) which preserves sort order when encoding binary data.
+       The <function>encode</function> function produces padded output,
+       while <function>decode</function> accepts both padded and unpadded
+       input. Decoding is case-insensitive and ignores whitespace characters.
+      </para>
+      <para>
+       This format can be used for encoding UUIDs in a compact, sortable format:
+       <literal>substring(encode(uuid_value :: bytea, 'base32hex') from 1 for 26)</literal>
+       produces a 26-character string compared to the standard 36-character
+       UUID representation.
       </para>
      </listitem>
     </varlistentry>
